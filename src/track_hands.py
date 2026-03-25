@@ -1,20 +1,9 @@
 """
 Video Hand-Object Interaction Tracker
 ======================================
-Basato su: "Learning Long-Horizon Robotic Manipulation from Human Videos via
-Interaction-Aware Keyframe Selection and Vision-Language Planning"
-(Giacobbe, Roveda, Braghin - Politecnico di Milano / IDSIA)
-
-Per ogni frame del video:
-  1. Traccia le mani con Google MediaPipe (21 keypoints per mano)
-  2. Localizza e traccia gli oggetti con YOLOv8 + ByteTrack
-
-Dipendenze:
-    pip install mediapipe opencv-python ultralytics numpy
-
-Uso:
-    python video_hoi_tracker.py --input video.mp4 --output output.mp4
-    python video_hoi_tracker.py --input video.mp4 --no-display
+Usage:
+    python track_anything.py --input video.mp4 --output output.mp4
+    python track_anything.py --input video.mp4 --no-display
 """
 
 import argparse
@@ -25,24 +14,15 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-try:
-    from ultralytics import YOLO
-    YOLO_AVAILABLE = True
-except ImportError:
-    YOLO_AVAILABLE = False
-    print("[WARNING] ultralytics non trovato. Installa con: pip install ultralytics")
-    print("          Il rilevamento oggetti non sarà disponibile.")
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Configurazione MediaPipe
+# Setup MediaPipe
 # ──────────────────────────────────────────────────────────────────────────────
 
 MP_HANDS = mp.solutions.hands
 MP_DRAWING = mp.solutions.drawing_utils
 MP_DRAWING_STYLES = mp.solutions.drawing_styles
 
-# Indici keypoint MediaPipe (standard 21 punti per mano)
+# Hand keypoint indeces
 KEYPOINT_NAMES = [
     "WRIST",                                           # 0
     "THUMB_CMC", "THUMB_MCP", "THUMB_IP", "THUMB_TIP",  # 1-4
@@ -52,23 +32,23 @@ KEYPOINT_NAMES = [
     "PINKY_MCP", "PINKY_PIP", "PINKY_DIP", "PINKY_TIP",  # 17-20
 ]
 
-# Indici dei fingertip (usati per calcolo prossimità oggetto, eq. 7 nell'articolo)
+# fingertip indeces
 FINGERTIP_INDICES = [4, 8, 12, 16, 20]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Strutture dati per ogni frame
+# Data structures
 # ──────────────────────────────────────────────────────────────────────────────
 
 class HandData:
-    """Contiene i dati di una mano rilevata in un frame."""
+    """Hand data from a single frame."""
 
     def __init__(self, handedness: str, keypoints: np.ndarray, bbox: tuple):
         """
         Args:
-            handedness: "Left" o "Right"
-            keypoints:  Array (21, 2) con coordinate pixel [x, y] dei 21 keypoints
-            bbox:       (x1, y1, x2, y2) bounding box della mano in pixel
+            handedness: "Left" or "Right"
+            keypoints:  Array (21, 2)
+            bbox:       (x1, y1, x2, y2)
         """
         self.handedness = handedness          # "Left" / "Right"
         self.keypoints = keypoints            # shape (21, 2), float32
@@ -76,12 +56,12 @@ class HandData:
 
     @property
     def wrist(self) -> np.ndarray:
-        """Coordinata del polso (keypoint 0)."""
+        """Wrist (keypoint 0)."""
         return self.keypoints[0]
 
     @property
     def centroid(self) -> np.ndarray:
-        """Centro del bounding box (posizione globale della mano, p_h nell'articolo)."""
+        """bbox center"""
         x1, y1, x2, y2 = self.bbox
         return np.array([(x1 + x2) / 2, (y1 + y2) / 2], dtype=np.float32)
 
@@ -99,75 +79,74 @@ class HandData:
         return float(np.mean(dists))
 
 
-class ObjectData:
-    """Contiene i dati di un oggetto rilevato e tracciato in un frame."""
+# class ObjectData:
+#     """Contiene i dati di un oggetto rilevato e tracciato in un frame."""
 
-    def __init__(self, track_id: int, label: str, confidence: float, bbox: tuple):
-        """
-        Args:
-            track_id:   ID univoco del tracker (ByteTrack)
-            label:      Etichetta COCO (es. "bottle", "cup")
-            confidence: Confidenza del rilevamento [0, 1]
-            bbox:       (x1, y1, x2, y2) bounding box in pixel
-        """
-        self.track_id = track_id
-        self.label = label
-        self.confidence = confidence
-        self.bbox = bbox
+#     def __init__(self, track_id: int, label: str, confidence: float, bbox: tuple):
+#         """
+#         Args:
+#             track_id:   ID univoco del tracker (ByteTrack)
+#             label:      Etichetta COCO (es. "bottle", "cup")
+#             confidence: Confidenza del rilevamento [0, 1]
+#             bbox:       (x1, y1, x2, y2) bounding box in pixel
+#         """
+#         self.track_id = track_id
+#         self.label = label
+#         self.confidence = confidence
+#         self.bbox = bbox
 
-    @property
-    def centroid(self) -> np.ndarray:
-        """
-        po_i(t): posizione del centroide dell'oggetto i al frame t.
-        Usato nelle equazioni 1-11 dell'articolo.
-        """
-        x1, y1, x2, y2 = self.bbox
-        return np.array([(x1 + x2) / 2, (y1 + y2) / 2], dtype=np.float32)
+#     @property
+#     def centroid(self) -> np.ndarray:
+#         """
+#         po_i(t): posizione del centroide dell'oggetto i al frame t.
+#         Usato nelle equazioni 1-11 dell'articolo.
+#         """
+#         x1, y1, x2, y2 = self.bbox
+#         return np.array([(x1 + x2) / 2, (y1 + y2) / 2], dtype=np.float32)
 
 
 class FrameResult:
     """Risultati dell'analisi di un singolo frame."""
 
     def __init__(self, frame_idx: int, timestamp_ms: float,
-                 hands: list[HandData], objects: list[ObjectData]):
+                 hands: list[HandData]):
         self.frame_idx = frame_idx
         self.timestamp_ms = timestamp_ms
         self.hands = hands      # Lista di HandData
-        self.objects = objects  # Lista di ObjectData
 
-    def hand_object_distances(self) -> dict:
-        """
-        Calcola d_i(t) = ||p_h(t) - po_i(t)|| per ogni coppia mano-oggetto.
-        Eq. 1 nell'articolo.
+    # def hand_object_distances(self) -> dict:
+    #     """
+    #     Calcola d_i(t) = ||p_h(t) - po_i(t)|| per ogni coppia mano-oggetto.
+    #     Eq. 1 nell'articolo.
 
-        Returns:
-            dict con chiavi (hand_idx, obj_track_id) e valori float (distanza pixel)
-        """
-        distances = {}
-        for h_idx, hand in enumerate(self.hands):
-            ph = hand.centroid
-            for obj in self.objects:
-                poi = obj.centroid
-                dist = float(np.linalg.norm(ph - poi))
-                distances[(h_idx, obj.track_id)] = dist
-        return distances
+    #     Returns:
+    #         dict con chiavi (hand_idx, obj_track_id) e valori float (distanza pixel)
+    #     """
+    #     distances = {}
+    #     for h_idx, hand in enumerate(self.hands):
+    #         ph = hand.centroid
+    #         for obj in self.objects:
+    #             poi = obj.centroid
+    #             dist = float(np.linalg.norm(ph - poi))
+    #             distances[(h_idx, obj.track_id)] = dist
+    #     return distances
 
-    def min_fingertip_distances(self) -> dict:
-        """
-        d_min_i(t): distanza minima tra i fingertip e l'oggetto i.
-        Usato nella Eq. 7 per calcolare il peso di prossimità w_d(t).
+    # def min_fingertip_distances(self) -> dict:
+    #     """
+    #     d_min_i(t): distanza minima tra i fingertip e l'oggetto i.
+    #     Usato nella Eq. 7 per calcolare il peso di prossimità w_d(t).
 
-        Returns:
-            dict con chiavi (hand_idx, obj_track_id) e valori float
-        """
-        distances = {}
-        for h_idx, hand in enumerate(self.hands):
-            fingertips = hand.fingertips  # (5, 2)
-            for obj in self.objects:
-                poi = obj.centroid
-                dists_to_obj = np.linalg.norm(fingertips - poi, axis=1)
-                distances[(h_idx, obj.track_id)] = float(np.min(dists_to_obj))
-        return distances
+    #     Returns:
+    #         dict con chiavi (hand_idx, obj_track_id) e valori float
+    #     """
+    #     distances = {}
+    #     for h_idx, hand in enumerate(self.hands):
+    #         fingertips = hand.fingertips  # (5, 2)
+    #         for obj in self.objects:
+    #             poi = obj.centroid
+    #             dists_to_obj = np.linalg.norm(fingertips - poi, axis=1)
+    #             distances[(h_idx, obj.track_id)] = float(np.min(dists_to_obj))
+    #     return distances
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -178,7 +157,7 @@ class VideoHOITracker:
     """
     Tracker Hand-Object Interaction su video MP4.
 
-    Pipeline (Sezione III.A dell'articolo):
+    Pipeline:
     1. Per ogni frame: rilevamento mani con MediaPipe (21 keypoints)
     2. Per ogni frame: rilevamento + tracking oggetti con YOLOv8 + ByteTrack
     3. Calcolo delle distanze mano-oggetto (base per il cost function)
@@ -188,19 +167,13 @@ class VideoHOITracker:
         self,
         mp_max_num_hands: int = 2,
         mp_min_detection_confidence: float = 0.5,
-        mp_min_tracking_confidence: float = 0.5,
-        yolo_model: str = "yolov8n.pt",
-        yolo_confidence: float = 0.4,
-        yolo_classes: list | None = None,
+        mp_min_tracking_confidence: float = 0.5
     ):
         """
         Args:
             mp_max_num_hands:              Numero massimo di mani da rilevare
             mp_min_detection_confidence:   Soglia confidenza rilevamento MediaPipe
             mp_min_tracking_confidence:    Soglia confidenza tracking MediaPipe
-            yolo_model:                    Modello YOLO (es. "yolov8n.pt", "yolov8s.pt")
-            yolo_confidence:               Soglia confidenza YOLO [0,1]
-            yolo_classes:                  Lista ID classi COCO da rilevare (None = tutte)
         """
         # MediaPipe Hands
         self.mp_hands = MP_HANDS.Hands(
@@ -210,13 +183,7 @@ class VideoHOITracker:
             min_tracking_confidence=mp_min_tracking_confidence,
         )
 
-        # YOLOv8 + ByteTrack
-        self.yolo = None
-        self.yolo_confidence = yolo_confidence
-        self.yolo_classes = yolo_classes
-        if YOLO_AVAILABLE:
-            print(f"[INFO] Carico modello YOLO: {yolo_model}")
-            self.yolo = YOLO(yolo_model)
+        
 
     def _detect_hands(self, frame_rgb: np.ndarray, frame_w: int, frame_h: int) -> list[HandData]:
         """
@@ -260,52 +227,52 @@ class VideoHOITracker:
 
         return hands
 
-    def _detect_objects(self, frame_bgr: np.ndarray) -> list[ObjectData]:
-        """
-        Rileva e traccia gli oggetti nel frame con YOLOv8 + ByteTrack.
+    # def _detect_objects(self, frame_bgr: np.ndarray) -> list[ObjectData]:
+    #     """
+    #     Rileva e traccia gli oggetti nel frame con YOLOv8 + ByteTrack.
 
-        Returns:
-            Lista di ObjectData, una per ogni oggetto tracciato
-        """
-        if self.yolo is None:
-            return []
+    #     Returns:
+    #         Lista di ObjectData, una per ogni oggetto tracciato
+    #     """
+    #     if self.yolo is None:
+    #         return []
 
-        results = self.yolo.track(
-            frame_bgr,
-            persist=True,           # mantiene gli ID di tracking tra i frame
-            tracker="bytetrack.yaml",
-            conf=self.yolo_confidence,
-            classes=self.yolo_classes,
-            verbose=False,
-        )
+    #     results = self.yolo.track(
+    #         frame_bgr,
+    #         persist=True,           # mantiene gli ID di tracking tra i frame
+    #         tracker="bytetrack.yaml",
+    #         conf=self.yolo_confidence,
+    #         classes=self.yolo_classes,
+    #         verbose=False,
+    #     )
 
-        objects = []
-        if results[0].boxes is None:
-            return objects
+    #     objects = []
+    #     if results[0].boxes is None:
+    #         return objects
 
-        boxes = results[0].boxes
-        names = results[0].names
+    #     boxes = results[0].boxes
+    #     names = results[0].names
 
-        for box in boxes:
-            # Salta oggetti senza track ID (ByteTrack non ancora assegnato)
-            if box.id is None:
-                continue
+    #     for box in boxes:
+    #         # Salta oggetti senza track ID (ByteTrack non ancora assegnato)
+    #         if box.id is None:
+    #             continue
 
-            track_id = int(box.id.item())
-            cls_id = int(box.cls.item())
-            label = names[cls_id]
-            conf = float(box.conf.item())
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
-            bbox = (int(x1), int(y1), int(x2), int(y2))
+    #         track_id = int(box.id.item())
+    #         cls_id = int(box.cls.item())
+    #         label = names[cls_id]
+    #         conf = float(box.conf.item())
+    #         x1, y1, x2, y2 = box.xyxy[0].tolist()
+    #         bbox = (int(x1), int(y1), int(x2), int(y2))
 
-            objects.append(ObjectData(
-                track_id=track_id,
-                label=label,
-                confidence=conf,
-                bbox=bbox,
-            ))
+    #         objects.append(ObjectData(
+    #             track_id=track_id,
+    #             label=label,
+    #             confidence=conf,
+    #             bbox=bbox,
+    #         ))
 
-        return objects
+    #     return objects
 
     def process_video(
         self,
@@ -366,16 +333,12 @@ class VideoHOITracker:
                 # ── 1. Rilevamento mani ───────────────────────────────────────
                 hands = self._detect_hands(frame_rgb, frame_w, frame_h)
 
-                # ── 2. Rilevamento e tracking oggetti ─────────────────────────
-                objects = self._detect_objects(frame_bgr)
-
                 # ── 3. Salva risultati ────────────────────────────────────────
                 frame_result = FrameResult(
                     frame_idx=frame_idx,
                     timestamp_ms=timestamp_ms,
-                    hands=hands,
-                    objects=objects,
-                )
+                    hands=hands
+                    )
                 all_results.append(frame_result)
 
                 # ── 4. Annotazione visiva ─────────────────────────────────────
@@ -383,14 +346,9 @@ class VideoHOITracker:
 
                 # ── 5. Stampa info a console ──────────────────────────────────
                 if frame_idx % 30 == 0:
-                    dists = frame_result.hand_object_distances()
-                    dist_str = ""
-                    if dists:
-                        min_pair = min(dists, key=dists.get)
-                        dist_str = f" | dist_min={dists[min_pair]:.1f}px"
                     print(
                         f"[Frame {frame_idx:5d}/{total_frames}] "
-                        f"Mani: {len(hands)} | Oggetti: {len(objects)}{dist_str}"
+                        f"Mani: {len(hands)}"
                     )
 
                 if writer:
@@ -430,26 +388,22 @@ class VideoHOITracker:
         for hand in result.hands:
             self._draw_hand(frame, hand)
 
-        # ── Oggetti tracciati ─────────────────────────────────────────────────
-        for obj in result.objects:
-            self._draw_object(frame, obj)
-
-        # ── Linee mano-oggetto (distanze) ─────────────────────────────────────
-        for hand in result.hands:
-            ph = hand.centroid.astype(int)
-            for obj in result.objects:
-                poi = obj.centroid.astype(int)
-                dist = np.linalg.norm(hand.centroid - obj.centroid)
-                # Colore: verde = vicino, rosso = lontano (soglia 150px)
-                color = (0, 200, 0) if dist < 150 else (0, 100, 200)
-                cv2.line(frame, tuple(ph), tuple(poi), color, 1, cv2.LINE_AA)
-                mid = ((ph[0] + poi[0]) // 2, (ph[1] + poi[1]) // 2)
-                cv2.putText(frame, f"{dist:.0f}px", mid,
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, color, 1)
+        # # ── Linee mano-oggetto (distanze) ─────────────────────────────────────
+        # for hand in result.hands:
+        #     ph = hand.centroid.astype(int)
+        #     for obj in result.objects:
+        #         poi = obj.centroid.astype(int)
+        #         dist = np.linalg.norm(hand.centroid - obj.centroid)
+        #         # Colore: verde = vicino, rosso = lontano (soglia 150px)
+        #         color = (0, 200, 0) if dist < 150 else (0, 100, 200)
+        #         cv2.line(frame, tuple(ph), tuple(poi), color, 1, cv2.LINE_AA)
+        #         mid = ((ph[0] + poi[0]) // 2, (ph[1] + poi[1]) // 2)
+        #         cv2.putText(frame, f"{dist:.0f}px", mid,
+        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, color, 1)
 
         # ── HUD info ──────────────────────────────────────────────────────────
         cv2.putText(frame,
-                    f"Mani: {len(result.hands)}  Oggetti: {len(result.objects)}",
+                    f"Mani: {len(result.hands)} ",
                     (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         return frame
@@ -488,24 +442,24 @@ class VideoHOITracker:
         cv2.drawMarker(frame, tuple(c), color,
                        cv2.MARKER_CROSS, 12, 2, cv2.LINE_AA)
 
-    def _draw_object(self, frame: np.ndarray, obj: ObjectData) -> None:
-        """Disegna il bounding box e il centroide dell'oggetto tracciato."""
-        PALETTE = [
-            (86, 180, 233), (230, 159, 0), (204, 121, 167),
-            (0, 158, 115), (213, 94, 0), (0, 114, 178),
-        ]
-        color = PALETTE[obj.track_id % len(PALETTE)]
-        x1, y1, x2, y2 = obj.bbox
+    # def _draw_object(self, frame: np.ndarray) -> None:
+    #     """Disegna il bounding box e il centroide dell'oggetto tracciato."""
+    #     PALETTE = [
+    #         (86, 180, 233), (230, 159, 0), (204, 121, 167),
+    #         (0, 158, 115), (213, 94, 0), (0, 114, 178),
+    #     ]
+    #     color = PALETTE[obj.track_id % len(PALETTE)]
+    #     x1, y1, x2, y2 = obj.bbox
 
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-        label_text = f"[{obj.track_id}] {obj.label} {obj.confidence:.2f}"
-        cv2.putText(frame, label_text, (x1, y2 + 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 2)
+    #     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+    #     label_text = f"[{obj.track_id}] {obj.label} {obj.confidence:.2f}"
+    #     cv2.putText(frame, label_text, (x1, y2 + 16),
+    #                 cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 2)
 
-        # Centroide po_i(t)
-        c = obj.centroid.astype(int)
-        cv2.circle(frame, tuple(c), 5, color, -1)
-        cv2.circle(frame, tuple(c), 5, (255, 255, 255), 1)
+    #     # Centroide po_i(t)
+    #     c = obj.centroid.astype(int)
+    #     cv2.circle(frame, tuple(c), 5, color, -1)
+    #     cv2.circle(frame, tuple(c), 5, (255, 255, 255), 1)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -536,34 +490,34 @@ def compute_hand_velocity(results: list[FrameResult], fps: float) -> list[np.nda
     return velocities
 
 
-def compute_hand_object_relative_velocity(
-    results: list[FrameResult], fps: float
-) -> list[dict]:
-    """
-    Calcola v_oi(t): velocità relativa mano-oggetto in pixel/secondo.
-    Derivata di d_i(t) rispetto al tempo (Sezione III.A).
+# def compute_hand_object_relative_velocity(
+#     results: list[FrameResult], fps: float
+# ) -> list[dict]:
+#     """
+#     Calcola v_oi(t): velocità relativa mano-oggetto in pixel/secondo.
+#     Derivata di d_i(t) rispetto al tempo (Sezione III.A).
 
-    Returns:
-        Lista di dict {(hand_idx, track_id): velocità_relativa float}
-    """
-    rel_velocities = [{}]
-    for t in range(1, len(results)):
-        curr = results[t]
-        prev = results[t - 1]
-        dt = (curr.timestamp_ms - prev.timestamp_ms) / 1000.0
-        if dt <= 0:
-            dt = 1.0 / fps
+#     Returns:
+#         Lista di dict {(hand_idx, track_id): velocità_relativa float}
+#     """
+#     rel_velocities = [{}]
+#     for t in range(1, len(results)):
+#         curr = results[t]
+#         prev = results[t - 1]
+#         dt = (curr.timestamp_ms - prev.timestamp_ms) / 1000.0
+#         if dt <= 0:
+#             dt = 1.0 / fps
 
-        curr_dists = curr.hand_object_distances()
-        prev_dists = prev.hand_object_distances()
+#         curr_dists = curr.hand_object_distances()
+#         prev_dists = prev.hand_object_distances()
 
-        rv = {}
-        for key in curr_dists:
-            if key in prev_dists:
-                rv[key] = abs(curr_dists[key] - prev_dists[key]) / dt
-        rel_velocities.append(rv)
+#         rv = {}
+#         for key in curr_dists:
+#             if key in prev_dists:
+#                 rv[key] = abs(curr_dists[key] - prev_dists[key]) / dt
+#         rel_velocities.append(rv)
 
-    return rel_velocities
+#     return rel_velocities
 
 
 def print_frame_summary(result: FrameResult) -> None:
@@ -663,10 +617,7 @@ def main() -> None:
     tracker = VideoHOITracker(
         mp_max_num_hands=args.max_hands,
         mp_min_detection_confidence=args.mp_detect_conf,
-        mp_min_tracking_confidence=args.mp_track_conf,
-        yolo_model=args.yolo_model,
-        yolo_confidence=args.yolo_conf,
-        yolo_classes=args.yolo_classes,
+        mp_min_tracking_confidence=args.mp_track_conf
     )
 
     results = tracker.process_video(
@@ -688,9 +639,9 @@ def main() -> None:
 
     if len(results) > 1:
         hand_vel = compute_hand_velocity(results, fps)
-        rel_vel = compute_hand_object_relative_velocity(results, fps)
+        # rel_vel = compute_hand_object_relative_velocity(results, fps)
         print(f"\n[INFO] Velocità mano calcolata per {len(hand_vel)} frame.")
-        print(f"[INFO] Velocità relativa mano-oggetto calcolata per {len(rel_vel)} frame.")
+        # print(f"[INFO] Velocità relativa mano-oggetto calcolata per {len(rel_vel)} frame.")
 
     print("\n[DONE] Elaborazione terminata.")
 
