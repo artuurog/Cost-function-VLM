@@ -1,5 +1,4 @@
 """
-step1_extract_frame.py
 ======================
 Usage
 -----
@@ -108,12 +107,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to the input .mp4 video file.",
     )
-    parser.add_argument(
-        "--hf-token",
-        required=True,
-        help="Your HuggingFace API token (starts with 'hf_'). "
-             "Required now so the full pipeline can reuse this script.",
-    )
+    
     return parser.parse_args()
 
 
