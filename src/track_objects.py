@@ -6,6 +6,7 @@ import base64
 import io
 import sys
 from pathlib import Path
+import re
 
 import cv2
 from openai import OpenAI
@@ -21,12 +22,15 @@ HF_TOKEN   = "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"
 
 PROMPT = (
     "You are an expert object localizer. Point to all the objects on the black table. "
-    "For each object say its name."
+    "For each object assign a label. If two objects are visually similar, assign a label that reflects their size (big/small)."
+    "Object labels must be unique."
     "Select a one pixel for each object on the table. The object pixels must be written next to the name of the object."
     "\nExample output:"
-    "\ngreen cup: (100, 200)"
-    "\nwhite cup: (200, 300)"
-    "\nred cup: (300, 400)"
+    "\n small green cup 1: (100, 200)"
+    "\n small green cup 2: (250, 420)"
+    "\n small white cup: (200, 300)"
+    "\n big white cup: (500, 540)"
+    "\n red cup: (300, 400)"
 )
 
 
@@ -84,7 +88,7 @@ def show_frame(frame) -> None:
 
 
 # ---------------------------------------------------------------------------
-# STEP 2 — Send the frame to Molmo-2-8B via the HuggingFace API
+# Send the frame to VLM via HuggingFace API
 # ---------------------------------------------------------------------------
 
 def encode_frame_as_base64(frame) -> str:
@@ -102,7 +106,7 @@ def encode_frame_as_base64(frame) -> str:
     return b64_string
 
 
-def call_molmo(frame, prompt: str, hf_token: str) -> str:
+def call_vlm(frame, prompt: str, hf_token: str) -> str:
     """
     Send the image + prompt to Molmo-2-8B via the HuggingFace router.
     """
@@ -143,8 +147,8 @@ def call_molmo(frame, prompt: str, hf_token: str) -> str:
     print("  Calling VLM...")
 
     completion = client.chat.completions.create(
-        model="allenai/Molmo2-8B",
-        # model="Qwen/Qwen3-VL-8B-Instruct",
+        # model="allenai/Molmo2-8B",
+        model="Qwen/Qwen3-VL-8B-Instruct",
         messages=messages,
         max_tokens=512,
     )
@@ -152,11 +156,70 @@ def call_molmo(frame, prompt: str, hf_token: str) -> str:
     return completion.choices[0].message.content
 
 
+def get_obj_coordinates(response: str) -> tuple[list[tuple[int, int]], list[str]]:
+    
+    objects     = []
+    coordinates = []
+ 
+    # Each line looks like:   <name>: (<u>, <v>)
+    # The pattern captures:
+    #   group 1 — the object name  (anything before the colon)
+    #   group 2 — u coordinate     (integer inside the parentheses)
+    #   group 3 — v coordinate     (integer inside the parentheses)
+    pattern = re.compile(r"^(.+?):\s*\((\d+),\s*(\d+)\)", re.MULTILINE)
+ 
+    for match in pattern.finditer(response):
+        name = match.group(1).strip()
+        u    = int(match.group(2))
+        v    = int(match.group(3))
+ 
+        objects.append(name)
+        coordinates.append((u, v))
+ 
+    return coordinates, objects
+ 
+
+def annotated_frame(frame, coords:list[tuple[int, int]] , obj_list:list[str] ) -> None:
+    annotated = frame.copy()
+ 
+    for (u, v), label in zip(coords, obj_list):
+ 
+        # --- Draw circle at the object location ------------
+        cv2.circle(
+            annotated,
+            center=(u, v),
+            radius=6,
+            color=(0, 255, 0),   
+            thickness=-1
+        )
+ 
+        # --- Draw the label text --
+        cv2.putText(
+            annotated,
+            text=label,
+            org=(u + 10, v - 10),
+            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale=0.55,
+            color=(0, 255, 0),
+            thickness=2,
+            lineType=cv2.LINE_AA,
+        )
+ 
+    # --- Display the annotated frame --------------------------------------
+    try:
+        cv2.imshow("Annotated Frame — press any key to close", annotated)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    except cv2.error:
+        print("  [INFO] No display available. Open the saved JPEG to view the frame.")
+
+    
 # ---------------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------------
+if __name__ == "__main__":
 
-def main():
+# def main():
 
     # --- Check that the video file exists ---------------------------------
     if not Path(VIDEO_PATH).is_file():
@@ -190,17 +253,26 @@ def main():
     print("  VLM object localization")
     print("=" * 55 + "\n")
 
-    response = call_molmo(frame, PROMPT, HF_TOKEN)
+    response = call_vlm(frame, PROMPT, HF_TOKEN)
 
     print("\n" + "-" * 55)
     print("  MODEL RESPONSE:")
     print("-" * 55)
     print(response)
     print("-" * 55)
+    
+    coords, obj_list = get_obj_coordinates(response)
+    
+    print("Recognized objects:")
+    print(obj_list)
+    print("Pixel positions:")
+    print(coords)
+    
+    annotated_frame(frame, coords, obj_list)
 
     print("\n VLM object localization complete.")
     print("=" * 55 + "\n")
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
