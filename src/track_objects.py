@@ -24,13 +24,15 @@ PROMPT = (
     "You are an expert object localizer. Point to all the objects on the black table. "
     "For each object assign a label. If two objects are visually similar, assign a label that reflects their size (big/small)."
     "Object labels must be unique."
-    "Select a one pixel for each object on the table. The object pixels must be written next to the name of the object."
-    "\nExample output:"
-    "\n small green cup 1: (100, 200)"
-    "\n small green cup 2: (250, 420)"
-    "\n small white cup: (200, 300)"
-    "\n big white cup: (500, 540)"
-    "\n red cup: (300, 400)"
+    "Select a one pixel for each object on the table. The position of the object must be written in pixel coordinates next to its label."
+    "\n The output must strictly follow the following structure for each identified object:"
+    "\n OBJECT_NAME: (pixel_u, pixel_v)"
+    # "\n small green cup 1: (100, 200)"
+    # "\n small green cup 2: (250, 420)"
+    # "\n small white cup: (200, 300)"
+    # "\n big white cup: (500, 540)"
+    # "\n red cup: (300, 400)"
+    "\n Do not show your reasoning. Write only the list of labels and pixels."
 )
 
 
@@ -150,7 +152,8 @@ def call_vlm(frame, prompt: str, hf_token: str) -> str:
         # model="allenai/Molmo2-8B",
         model="Qwen/Qwen3-VL-8B-Instruct",
         messages=messages,
-        max_tokens=512,
+        max_tokens=300,
+        temperature=0,
     )
 
     return completion.choices[0].message.content
@@ -219,8 +222,6 @@ def annotated_frame(frame, coords:list[tuple[int, int]] , obj_list:list[str] ) -
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
 
-# def main():
-
     # --- Check that the video file exists ---------------------------------
     if not Path(VIDEO_PATH).is_file():
         print(f"[ERROR] Video not found: '{VIDEO_PATH}'")
@@ -268,11 +269,11 @@ if __name__ == "__main__":
     print("Pixel positions:")
     print(coords)
     
+    # =========================================================
+    # Visualize VLM result
+    # =========================================================
+    
     annotated_frame(frame, coords, obj_list)
 
     print("\n VLM object localization complete.")
     print("=" * 55 + "\n")
-
-
-# if __name__ == "__main__":
-#     main()
