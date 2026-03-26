@@ -110,7 +110,7 @@ def encode_frame_as_base64(frame) -> str:
 
 def call_vlm(frame, prompt: str, hf_token: str) -> str:
     """
-    Send the image + prompt to Molmo-2-8B via the HuggingFace router.
+    Send the image + prompt to Molmo-2-8B via the HuggingFace router.  
     """
 
     # --- Build the client -------------------------------------------------
