@@ -1,162 +1,204 @@
 """
-======================
-Usage
------
-  python track_objects.py --video path/to/video.mp4 --hf-token hf_xxxx
 
 """
 
-import argparse
+import base64
+import io
 import sys
 from pathlib import Path
 
 import cv2
+from openai import OpenAI
+from PIL import Image
 
 
 # ---------------------------------------------------------------------------
-# Configuration
+# USER SETTINGS  — edit these before running
 # ---------------------------------------------------------------------------
 
-# Default Molmo-2-8B endpoint on the HuggingFace Inference API.
-# We only validate the token here; the actual API call comes in Step 2.
-MOLMO_ENDPOINT = (
-    "https://api-inference.huggingface.co/models/allenai/Molmo-2-8B-O-0924"
+VIDEO_PATH = "C:/Users/user/Desktop/PoliMi/DOTTORATO/hand object interaction/video/my_demos/red_block1.mp4"
+HF_TOKEN   = "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"
+
+PROMPT = (
+    "You are an expert object localizer. Point to all the objects on the black table. "
+    "For each object say its name."
+    "Select a one pixel for each object on the table. The object pixels must be written next to the name of the object."
+    "\nExample output:"
+    "\ngreen cup: (100, 200)"
+    "\nwhite cup: (200, 300)"
+    "\nred cup: (300, 400)"
 )
 
-HF_TOKEN = "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"
+
 # ---------------------------------------------------------------------------
-# Helpers
+# STEP 1 — Extract the first frame from the video
 # ---------------------------------------------------------------------------
 
-def extract_first_frame(video_path: str) -> tuple:
+def extract_first_frame(video_path: str):
     """
-    Open the video and read the very first frame.
+    Open the video file and read the very first frame.
 
     Returns
     -------
-    frame : numpy ndarray, shape (H, W, 3), dtype uint8, BGR colour order
-    fps   : float — frames per second of the source video
-    total : int   — total number of frames in the video
+    frame  : numpy array (H, W, 3) in BGR colour order
+    fps    : frames per second of the video
+    total  : total number of frames
     """
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
-        raise RuntimeError(
-            f"Cannot open video file: '{video_path}'\n"
-            "Make sure the path is correct and the file is a valid .mp4."
-        )
+        raise RuntimeError(f"Cannot open video: '{video_path}'")
 
-    # Read basic video metadata before grabbing the frame
-    fps         = cap.get(cv2.CAP_PROP_FPS)
-    total       = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    width       = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height      = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps    = cap.get(cv2.CAP_PROP_FPS)
+    total  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     ret, frame = cap.read()
     cap.release()
 
     if not ret or frame is None:
-        raise RuntimeError(
-            "The video opened successfully but the first frame could not be read.\n"
-            "The file may be corrupted or encoded in an unsupported format."
-        )
+        raise RuntimeError("Could not read the first frame from the video.")
 
     print(f"  Resolution : {width} x {height} pixels")
     print(f"  Frame rate : {fps:.2f} fps")
-    print(f"  Duration   : {total} frames  (~{total / fps:.1f} seconds)")
+    print(f"  Duration   : {total} frames (~{total / fps:.1f} seconds)")
 
     return frame, fps, total
 
 
 def save_frame(frame, output_path: str) -> None:
-    """Save a BGR frame as a JPEG image to disk."""
-    success = cv2.imwrite(output_path, frame)
-    if not success:
-        raise RuntimeError(f"cv2.imwrite failed for path: '{output_path}'")
-    print(f"  First frame saved to: {output_path}")
+    """Save a BGR frame as a JPEG file."""
+    cv2.imwrite(output_path, frame)
+    print(f"  Frame saved to: {output_path}")
 
 
-def show_frame(frame, window_title: str = "First Frame — press any key to close") -> None:
-    """
-    Display the frame in an OpenCV window.
-    The window stays open until the user presses any key.
-    Works on desktop environments; in headless servers it is skipped gracefully.
-    """
+def show_frame(frame) -> None:
+    """Display the frame in a window. Press any key to close."""
     try:
-        cv2.imshow(window_title, frame)
-        cv2.waitKey(0)          # wait indefinitely for a key press
+        cv2.imshow("First Frame — press any key to close", frame)
+        cv2.waitKey(0)
         cv2.destroyAllWindows()
     except cv2.error:
-        # OpenCV raises an error when there is no display available (e.g. SSH)
-        print(
-            "  [INFO] No display detected — skipping interactive window.\n"
-            "  Open the saved JPEG file to view the frame."
-        )
+        print("  [INFO] No display available. Open the saved JPEG to view the frame.")
 
 
 # ---------------------------------------------------------------------------
-# CLI
+# STEP 2 — Send the frame to Molmo-2-8B via the HuggingFace API
 # ---------------------------------------------------------------------------
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Step 1 — Extract and display the first frame of an .mp4 video."
+def encode_frame_as_base64(frame) -> str:
+    """
+    Convert a BGR OpenCV frame to a base64-encoded JPEG string.
+    """
+    rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(rgb_image)
+
+    buffer = io.BytesIO()
+    pil_image.save(buffer, format="JPEG", quality=90)
+    buffer.seek(0)
+
+    b64_string = base64.b64encode(buffer.read()).decode("utf-8")
+    return b64_string
+
+
+def call_molmo(frame, prompt: str, hf_token: str) -> str:
+    """
+    Send the image + prompt to Molmo-2-8B via the HuggingFace router.
+    """
+
+    # --- Build the client -------------------------------------------------
+    client = OpenAI(
+        base_url="https://router.huggingface.co/v1",
+        api_key=hf_token,
     )
-    parser.add_argument(
-        "--video",
-        required=True,
-        help="Path to the input .mp4 video file.",
+
+    # --- Encode the frame -------------------------------------------------
+    print("  Encoding frame as base64 JPEG...")
+    b64_image = encode_frame_as_base64(frame)
+
+    # --- Build the message ------------------------------------------------
+    # The message has two parts: the text prompt and the image.
+    # The image is embedded as a data URI so no external URL is needed.
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{b64_image}"
+                    },
+                },
+            ],
+        }
+    ]
+
+    # --- Call the API -----------------------------------------------------
+    print(f"  Prompt  : \"{prompt}\"")
+    print("  Calling VLM...")
+
+    completion = client.chat.completions.create(
+        model="allenai/Molmo2-8B",
+        # model="Qwen/Qwen3-VL-8B-Instruct",
+        messages=messages,
+        max_tokens=512,
     )
-    
-    return parser.parse_args()
+
+    return completion.choices[0].message.content
 
 
 # ---------------------------------------------------------------------------
-# Main
+# MAIN
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    args = parse_args()
+def main():
 
-    # --- Validate inputs ---------------------------------------------------
-
-    video_path = args.video
-
-    if not Path(video_path).is_file():
-        print(f"[ERROR] Video file not found: '{video_path}'")
+    # --- Check that the video file exists ---------------------------------
+    if not Path(VIDEO_PATH).is_file():
+        print(f"[ERROR] Video not found: '{VIDEO_PATH}'")
         sys.exit(1)
 
-    if not HF_TOKEN.startswith("hf_"):
-        print("[WARNING] The HuggingFace token usually starts with 'hf_'. "
-              "Double-check that it is correct.")
-
+    # =========================================================
+    # Extract the first frame
+    # =========================================================
     print("\n" + "=" * 55)
-    print("  STEP 1 — Extract first frame")
+    print(" Extract first frame")
     print("=" * 55)
+    print(f"\n  Video : {VIDEO_PATH}\n")
 
-    # --- Pipeline configuration summary -----------------------------------
-    print(f"\n  Video file    : {video_path}")
-    print(f"  Molmo endpoint: {MOLMO_ENDPOINT}")
+    frame, fps, total_frames = extract_first_frame(VIDEO_PATH)
 
-    # --- Extract the first frame ------------------------------------------
-    print("\n  Extracting first frame...")
-    frame, fps, total_frames = extract_first_frame(video_path)
+    # Save the frame as a JPEG in the same folder as the video
+    # stem       = Path(VIDEO_PATH).stem
+    # output_dir = Path(VIDEO_PATH).parent
+    # frame_path = str(output_dir / f"{stem}_first_frame.jpg")
 
-    # --- Save the frame to disk -------------------------------------------
-    # Place the output JPEG next to the input video, same name + suffix
-    stem        = Path(video_path).stem
-    output_dir  = Path(video_path).parent
-    output_path = str(output_dir / f"{stem}_first_frame.jpg")
-
-    save_frame(frame, output_path)
-
-    # --- Display the frame ------------------------------------------------
-    print("\n  Displaying frame (press any key in the window to close)...")
+    # save_frame(frame, frame_path)
     show_frame(frame)
 
-    # --- Done -------------------------------------------------------------
-    print("\n  Step 1 complete.")
-    print(f"  Next step: send '{output_path}' to Molmo-2-8B for object detection.")
+    print("\n  Frame visualized.\n")
+
+    # =========================================================
+    # VLM frame analysis
+    # =========================================================
+    print("=" * 55)
+    print("  VLM object localization")
+    print("=" * 55 + "\n")
+
+    response = call_molmo(frame, PROMPT, HF_TOKEN)
+
+    print("\n" + "-" * 55)
+    print("  MODEL RESPONSE:")
+    print("-" * 55)
+    print(response)
+    print("-" * 55)
+
+    print("\n VLM object localization complete.")
     print("=" * 55 + "\n")
 
 
