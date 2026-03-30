@@ -1,7 +1,5 @@
 """
 Combine hand tracking and object tracking.
-
-
 """
 
 VIDEO_PATH = "C:/Users/user/Desktop/PoliMi/DOTTORATO/hand object interaction/video/my_demos/red_block1.mp4"
