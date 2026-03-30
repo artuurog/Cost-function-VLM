@@ -405,7 +405,7 @@ def parse_args() -> argparse.Namespace:
         help="Salta N frame tra un'analisi e l'altra (default: 0)"
     )
     parser.add_argument(
-        "--max-hands", type=int, default=2,
+        "--max-hands", type=int, default=1,
         help="Numero massimo di mani da rilevare (default: 2)"
     )
     parser.add_argument(
@@ -416,19 +416,19 @@ def parse_args() -> argparse.Namespace:
         "--mp-track-conf", type=float, default=0.5,
         help="Soglia confidenza tracking MediaPipe (default: 0.5)"
     )
-    parser.add_argument(
-        "--yolo-model", default="yolov8n.pt",
-        help="Modello YOLO da usare (default: yolov8n.pt)"
-    )
-    parser.add_argument(
-        "--yolo-conf", type=float, default=0.4,
-        help="Soglia confidenza YOLO (default: 0.4)"
-    )
-    parser.add_argument(
-        "--yolo-classes", nargs="+", type=int, default=None,
-        help="ID classi COCO da rilevare (default: tutte). "
-             "Es: --yolo-classes 39 41 67 (bottiglia, tazza, telefono)"
-    )
+    # parser.add_argument(
+    #     "--yolo-model", default="yolov8n.pt",
+    #     help="Modello YOLO da usare (default: yolov8n.pt)"
+    # )
+    # parser.add_argument(
+    #     "--yolo-conf", type=float, default=0.4,
+    #     help="Soglia confidenza YOLO (default: 0.4)"
+    # )
+    # parser.add_argument(
+    #     "--yolo-classes", nargs="+", type=int, default=None,
+    #     help="ID classi COCO da rilevare (default: tutte). "
+    #          "Es: --yolo-classes 39 41 67 (bottiglia, tazza, telefono)"
+    # )
     parser.add_argument(
         "--verbose", action="store_true",
         help="Stampa dettagli per ogni frame"
@@ -436,43 +436,40 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
 
+if __name__ == "__main__":
+    args = parse_args()
+    
     # Validazione input
     if not Path(args.input).exists():
         print(f"[ERROR] File non trovato: {args.input}")
         sys.exit(1)
-
+    
     tracker = VideoHOITracker(
         mp_max_num_hands=args.max_hands,
         mp_min_detection_confidence=args.mp_detect_conf,
         mp_min_tracking_confidence=args.mp_track_conf
     )
-
+    
     results = tracker.process_video(
         input_path=args.input,
         output_path=args.output,
         display=not args.no_display,
         skip_frames=args.skip,
     )
-
+    
     # ── Post-processing opzionale ─────────────────────────────────────────────
     if args.verbose:
         for r in results[:5]:  # stampa solo i primi 5 frame per brevità
             print_frame_summary(r)
-
+    
     # Calcolo velocità (disponibile per uso successivo, es. cost function)
     cap = cv2.VideoCapture(args.input)
     fps = cap.get(cv2.CAP_PROP_FPS)
     cap.release()
-
+    
     if len(results) > 1:
         hand_vel = compute_hand_velocity(results, fps)
         print(f"\n[INFO] Velocità mano calcolata per {len(hand_vel)} frame.")
-
+    
     print("\n[DONE] Elaborazione terminata.")
-
-
-if __name__ == "__main__":
-    main()
