@@ -1,4 +1,4 @@
-; PDDL Domain – Block Stacking Pyramid
+; PDDL Domain – Block Stacking Task
 ; Robot: gofa_robot
 ; Actions: grasp, move, release
 
