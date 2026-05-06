@@ -1,9 +1,6 @@
 """
 Video Hand-Object Interaction Tracker
 ======================================
-Usage:
-    python track_anything.py --input video.mp4 --output output.mp4
-    python track_anything.py --input video.mp4 --no-display
 """
 
 import argparse
@@ -67,20 +64,16 @@ class HandData:
 
     @property
     def fingertips(self) -> np.ndarray:
-        """Coordinate dei 5 fingertip, shape (5, 2)."""
+        """Fingertip coordinates, shape (5, 2)."""
         return self.keypoints[FINGERTIP_INDICES]
 
     def hand_spread(self) -> float:
-        """
-        R(t): distanza media di ogni keypoint dal polso.
-        Eq. 6 nell'articolo: misura dell'apertura della mano.
-        """
         dists = np.linalg.norm(self.keypoints[1:] - self.wrist, axis=1)
         return float(np.mean(dists))
 
 
 class FrameResult:
-    """Risultati dell'analisi di un singolo frame."""
+    """Results from the analysis of a single frame."""
 
     def __init__(self, frame_idx: int, timestamp_ms: float,
                  hands: list[HandData]):
@@ -95,12 +88,8 @@ class FrameResult:
 
 class VideoHOITracker:
     """
-    Tracker Hand-Object Interaction su video MP4.
+    Tracker Hand-Object Interaction for MP4 video.
 
-    Pipeline:
-    1. Per ogni frame: rilevamento mani con MediaPipe (21 keypoints)
-    2. Per ogni frame: rilevamento + tracking oggetti con YOLOv8 + ByteTrack
-    3. Calcolo delle distanze mano-oggetto (base per il cost function)
     """
 
     def __init__(
