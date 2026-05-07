@@ -38,19 +38,19 @@ The pipeline proceeds as follows:
 ```
 .           
 ├── src/
-   ├── bridge
-       ├── pddl2rapid.py
-       └── pose_config.yaml
-   ├── keyframes
-       ├── cost_function.py
-       ├── keyframes.py
-       └── interaction_prob.py
-   ├── tracking
-       ├── track_combined.pyù
-       ├── track_hands.py
-       └── track_objects.py
-   └── utils
-       └── utils.py
+|   ├── bridge
+|       ├── pddl2rapid.py
+|       └── pose_config.yaml
+|   ├── keyframes
+|       ├── cost_function.py
+|       ├── keyframes.py
+|       └── interaction_prob.py
+|   ├── tracking
+|       ├── track_combined.pyù
+|       ├── track_hands.py
+|       └── track_objects.py
+|   └── utils
+|       └── utils.py
 └── pddl/
    ├── bowl/
    ├── insertion/
