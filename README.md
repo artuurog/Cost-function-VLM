@@ -28,7 +28,7 @@ The pipeline proceeds as follows:
 5. The frames corresponding to local probability maxima are extracted as keyframes, each annotated with the dominant interacting object.
 6. The keyframes are fed sequentially to a VLM for task understanding and PDDL plan generation.
 
-## Repository Structure
+## Repo Structure
 
 ```
 .           
