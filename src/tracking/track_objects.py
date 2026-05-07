@@ -37,7 +37,7 @@ PROMPT = (
 
 
 # ---------------------------------------------------------------------------
-# STEP 1 — Extract the first frame from the video
+# Extract the first frame from the video
 # ---------------------------------------------------------------------------
 
 def extract_first_frame(video_path: str):
@@ -108,19 +108,15 @@ def call_vlm(frame, prompt: str, hf_token: str) -> str:
     Send the image + prompt to VLM via the HuggingFace router.  
     """
 
-    # --- Build the client -------------------------------------------------
     client = OpenAI(
         base_url="https://router.huggingface.co/v1",
         api_key=hf_token,
     )
 
-    # --- Encode the frame -------------------------------------------------
     print("  Encoding frame as base64 JPEG...")
     b64_image = encode_frame_as_base64(frame)
 
-    # --- Build the message ------------------------------------------------
-    # The message has two parts: the text prompt and the image.
-    # The image is embedded as a data URI so no external URL is needed.
+   
     messages = [
         {
             "role": "user",
@@ -139,7 +135,6 @@ def call_vlm(frame, prompt: str, hf_token: str) -> str:
         }
     ]
 
-    # --- Call the API -----------------------------------------------------
     print(f"  Prompt  : \"{prompt}\"")
     print("  Calling VLM...")
 
