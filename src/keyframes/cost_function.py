@@ -273,7 +273,7 @@ def distance_cost(
     d_max:     float,
 ) -> np.ndarray:
     """
-    phi_d_i(t) = ||p_h(t) - p_oi(t)|| / d_max          (Eq. 2)
+    phi_d_i(t) = ||p_h(t) - p_oi(t)|| / d_max
 
     Parameters
     ----------
@@ -294,7 +294,7 @@ def hand_velocity_cost(
     vh_max:  float,
 ) -> np.ndarray:
     """
-    phi_v(t) = ||v_h(t)|| / vh_max                       (Eq. 3)
+    phi_v(t) = ||v_h(t)|| / vh_max
 
     Parameters
     ----------
@@ -315,7 +315,7 @@ def hand_direction_cost(
     poi: np.ndarray,
 ) -> np.ndarray:
     """
-    phi_dir_i(t) = 1 - max(0, cos(theta_i(t)))           (Eq. 4)
+    phi_dir_i(t) = 1 - max(0, cos(theta_i(t)))
 
     cos(theta_i) = v_h · (p_h - p_oi) / (||v_h|| * ||p_h - p_oi||)
 
@@ -356,7 +356,7 @@ def object_velocity_cost(
     v_th:  float,
 ) -> np.ndarray:
     """
-    Relative hand-object velocity cost                   (Eq. 5)
+    Relative hand-object velocity cost
 
     v_oi(t) = d/dt ||p_h(t) - p_oi(t)||
     phi_obj_i(t) = 0                            if ||v_oi|| < v_th
@@ -396,14 +396,13 @@ def hand_compactness_cost(
     sigma_d:    float,
 ) -> np.ndarray:
     """
-    phi_comp(t) = 1 / (1 + w_d(t) * alpha(t))            (Eq. 8)
+    phi_comp(t) = 1 / (1 + w_d(t) * alpha(t))
 
     with
-      R(t)     = mean distance of each keypoint from wrist  (Eq. 6)
+      R(t)     = mean distance of each keypoint from wrist
       alpha(t) = 1 - R(t) / R_ref
       d_min_i(t) = min distance from fingertips to object i
-      w_d(t)   = exp( -d_min_i(t)^2 / (2 * sigma_d^2) )  (Eq. 7)
-
+      w_d(t)   = exp( -d_min_i(t)^2 / (2 * sigma_d^2) )
     Parameters
     ----------
     records  : list of FrameRecord
@@ -443,16 +442,7 @@ def enclosure_cost(
     poi:     np.ndarray,
 ) -> np.ndarray:
     """
-    phi_enc_i(t) = exp(-(rho_i(t) - 1)) - 1              (Eq. 10)
-
-    When pixel-level segmentation masks are unavailable (txt-file input),
-    rho_i(t) is approximated geometrically:
-      – Compute the convex hull of the 21 hand keypoints.
-      – rho is the fraction of the object bounding box corners that lie
-        inside the hull, mapped to [0, 1].
-
-    Intuition: the cost is 0 when rho = 1 (full enclosure) and
-    rises to e^1 - 1 ≈ 1.718 when rho = 0 (no enclosure).
+    phi_enc_i(t) = exp(-(rho_i(t) - 1)) - 1
 
     Parameters
     ----------
@@ -492,7 +482,6 @@ def enclosure_cost(
             inside = tri.find_simplex(test_pts) >= 0
             rho   = float(np.mean(inside))
         except Exception:
-            # Degenerate hull (hand nearly collapsed)
             rho = 0.0
 
         phi_enc[t] = np.exp(-(rho - 1.0)) - 1.0
@@ -505,10 +494,7 @@ def coupling_term(
     phi_v: np.ndarray,
 ) -> np.ndarray:
     """
-    phi_couple_i(t) = max(0, exp(phi_d_i(t) * phi_v(t)) - 1)   (Eq. 11)
-
-    No separate normalisation is needed because the exponent already
-    contains normalised quantities; the result is always >= 0.
+    phi_couple_i(t) = max(0, exp(phi_d_i(t) * phi_v(t)) - 1)
 
     Parameters
     ----------
