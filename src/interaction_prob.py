@@ -28,11 +28,9 @@ COST_FILE_PATH   = "results/cost_function.txt"
 OUTPUT_PATH      = "results/interaction_probability.txt"
 
 # Savitzky-Golay filter parameters
-# window_length must be odd and > polyorder; increase to smooth more aggressively
 SG_WINDOW_LENGTH: int = 11
 SG_POLYORDER:     int = 3
 
-# Minimum number of frames between two consecutive keyframes (avoids duplicates)
 MIN_PEAK_DISTANCE: int = 5
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -164,9 +162,6 @@ def softmax_probability(
     obj_labels: List[str],
 ) -> Dict[str, np.ndarray]:
     """
-    Convert costs J_i(t) to interaction probabilities P_i(t) via
-    temperature-scaled softmax
-
     Parameters
     ----------
     J          : dict[label -> cost array shape (T,)]
@@ -212,7 +207,6 @@ def smooth_probability(
     polyorder:     int = SG_POLYORDER,
 ) -> np.ndarray:
     """
-
     Parameters
     ----------
     P             : raw probability array, shape (T,)
@@ -244,7 +238,6 @@ def detect_interaction_peaks(
     min_peak_distance: int = MIN_PEAK_DISTANCE,
 ) -> Tuple[np.ndarray, float]:
     """
-
     Parameters
     ----------
     P_smooth          : smoothed probability array, shape (T,)
@@ -288,7 +281,6 @@ def select_keyframes(
     peak_indices_per_obj: Dict[str, np.ndarray],
 ) -> List[Keyframe]:
     """
-
     Parameters
     ----------
     P                    : raw probability dict[label -> (T,)]
@@ -347,7 +339,6 @@ def save_probability_results(
     keyframes:    List[Keyframe],
 ) -> None:
     """
-   
     File structure
     --------------
     [Header]
