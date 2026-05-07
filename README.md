@@ -90,7 +90,7 @@ HF_TOKEN   = "hf_..."
 ```python
 VIDEO_PATH     = "path/to/your/video.mp4"
 OUTPUT_PATH    = "results/tracking_results.txt"
-OPENAI_API_KEY = "sk-..."
+API_KEY = "hf-..."
 DINO_THRESHOLD = 0.30       # GroundingDINO confidence threshold
 REDETECT_EVERY = 30         # Re-run detection every N frames (0 = disabled)
 DISPLAY        = True       # Show live annotated video
