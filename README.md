@@ -29,7 +29,7 @@ The pipeline proceeds as follows:
 6. The keyframes are fed sequentially to a VLM for task understanding and PDDL plan generation.
 
 <p align="center">
-  <img src="media/overview metodo.pdf" alt="Method overview" width="750"/>
+  <img src="media/method_overview.png" alt="Method overview" width="750"/>
 </p>
 
 Standard approaches to learning manipulation tasks...
