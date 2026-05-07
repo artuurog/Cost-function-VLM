@@ -32,7 +32,6 @@ The pipeline proceeds as follows:
   <img src="media/method_overview.png" alt="Method overview" width="750"/>
 </p>
 
-Standard approaches to learning manipulation tasks...
 
 ## Repo Structure
 
