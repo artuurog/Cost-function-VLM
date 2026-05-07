@@ -2,8 +2,7 @@
 
 A model-based keyframe extraction pipeline for robotic task learning from human video demonstrations. Given an RGB video of a human manipulation task, this codebase identifies the most informative frames — those corresponding to meaningful hand-object interactions — and delivers them to a Vision-Language Model (VLM) for task plan generation.
 
-This repository implements the methodology described in the preprint:
-> *"Keyframe Extraction from Human Demonstrations via Hand-Object Interaction Cost Function for VLM-Based Task Learning"*
+This repository implements the methodology described in the paper "Keyframe Extraction from Human Demonstrations via Hand-Object Interaction Cost Function for VLM-Based Task Learning"*
 
 ---
 
