@@ -140,8 +140,6 @@ One data block per object. Each block has a column header comment followed by fi
 ```
 # OBJECT: red_block
 #    frame_idx  timestamp_ms    phi_d    phi_v  phi_dir  phi_obj  phi_comp  phi_enc  phi_couple          J
-         0         0.000   0.312451   0.089234  ...
-         1        33.333   0.298771   0.091122  ...
 ```
 
 ### `results/interaction_probability.txt`
@@ -152,13 +150,11 @@ Contains per-object probability time histories followed by the final keyframe ta
 # OBJECT: red_block
 #   P90 threshold used for peak filtering: 0.412300
 #    frame_idx  timestamp_ms    P_raw   P_smooth
-          0        0.000    0.5102    0.4987
           ...
 
 # KEYFRAME TABLE
 #     rank  frame_idx  timestamp_ms        dominant_object  probability
-         1         42       1400.0            red_block      0.7823
-         2        107       3566.7                blue_cup   0.6541
+
 ```
 
 ---
