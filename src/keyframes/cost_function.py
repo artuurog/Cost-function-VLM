@@ -729,7 +729,7 @@ def compute_all_costs(
     -------
     costs : dict[label, dict[term_name, np.ndarray]]
     """
-    # ── 1. Load tracking data ─────────────────────────────────────────────────
+    # ── Load tracking data ─────────────────────────────────────────────────
     records, fps = parse_tracking_file(tracking_path)
     if not records:
         raise RuntimeError("No frame records found in the tracking file.")
@@ -740,18 +740,18 @@ def compute_all_costs(
 
     print(f"[Cost]   Objects detected: {obj_labels}")
 
-    # ── 2. Kinematic arrays ────────────────────────────────────────────────────
+    # ── Kinematic arrays ────────────────────────────────────────────────────
     ph      = compute_hand_positions(records)
     vh      = compute_hand_velocities(ph, records, fps)
     obj_pos = compute_object_positions(records, obj_labels)
 
-    # ── 3. Global normalisation constants ─────────────────────────────────────
+    # ── Global normalisation constants ─────────────────────────────────────
     norms = compute_global_normalisation(ph, vh, obj_pos, records, fps)
     print("[Cost]   Normalisation constants:")
     for k, v in norms.items():
         print(f"           {k:10s} = {v:.4f}")
 
-    # ── 4. Cost evaluation per object ──────────────────────────────────────────
+    # ── Cost evaluation per object ──────────────────────────────────────────
     all_costs: Dict[str, Dict[str, np.ndarray]] = {}
     for label in obj_labels:
         print(f"[Cost]   Computing costs for '{label}' ...")
@@ -765,7 +765,6 @@ def compute_all_costs(
             norms   = norms,
         )
 
-    # ── 5. Save to file ────────────────────────────────────────────────────────
     save_cost_results(output_path, records, obj_labels, all_costs, fps)
 
     return all_costs
