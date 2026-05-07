@@ -31,21 +31,28 @@ The pipeline proceeds as follows:
 ## Repository Structure
 
 ```
-.
-├── track_objects.py         
-├── track_combined.py        
-├── utils.py                 
-├── cost_function.py          
-├── interaction_prob.py      
-├── keyframes.py              
-├── keyframes/               
-│   ├── keyframes.py
-│   ├── cost_function.py
-│   ├── interaction_probability.py
-│   └── keyframes/ 
-│       ├── kf_001_frame0042_cup.jpg
-│       └── ...
-└── VLM_keyframe_cost_function_PREPRINT.pdf   # Reference paper
+.           
+├── src/
+|   ├── bridge
+|       ├── pddl2rapid.py
+|       └── pose_config.yaml
+|   ├── keyframes
+|       ├── cost_function.py
+|       ├── keyframes.py
+|       └── interaction_prob.py
+|   ├── tracking
+|       ├── track_combined.pyù
+|       ├── track_hands.py
+|       └── track_objects.py
+|   └── utils
+|       └── utils.yaml
+├── pddl/
+|   ├── bowl/
+|   ├── insertion/
+|   ├── sorting/
+|   ├── stacking/
+|   └── tool/
+└── 
 ```
 
 ---
