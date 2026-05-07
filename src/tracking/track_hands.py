@@ -388,7 +388,7 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     
-    # Validazione input
+    # Validate input
     if not Path(args.input).exists():
         print(f"[ERROR] File not found: {args.input}")
         sys.exit(1)
@@ -406,12 +406,11 @@ if __name__ == "__main__":
         skip_frames=args.skip,
     )
     
-    # ── Post-processing opzionale ─────────────────────────────────────────────
+    # ── Post-processing ─────────────────────────────────────────────
     if args.verbose:
-        for r in results[:5]:  # stampa solo i primi 5 frame per brevità
+        for r in results[:5]:
             print_frame_summary(r)
     
-    # Calcolo velocità (disponibile per uso successivo, es. cost function)
     cap = cv2.VideoCapture(args.input)
     fps = cap.get(cv2.CAP_PROP_FPS)
     cap.release()
