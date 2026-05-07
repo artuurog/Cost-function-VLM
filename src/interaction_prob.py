@@ -429,9 +429,6 @@ def save_probability_results(
     print(f"[Writer] Probability results saved to '{output_path}'")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Top-level pipeline
-# ─────────────────────────────────────────────────────────────────────────────
 
 def compute_interaction_probability(
     cost_path:   str = COST_FILE_PATH,
@@ -526,9 +523,6 @@ def compute_interaction_probability(
     return P_smooth, keyframes
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Convenience accessor
-# ─────────────────────────────────────────────────────────────────────────────
 
 def get_keyframe_indices(keyframes: List[Keyframe]) -> List[int]:
     """
