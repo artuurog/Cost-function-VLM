@@ -131,11 +131,11 @@ One block per frame. Each block starts with a `FRAME` line followed by optional 
 
 ```
 # FPS: 30.00
-FRAME 0 0.000
+FRAME 0 
 HAND Right  <cx> <cy>  <kp0x> <kp0y> ... <kp20x> <kp20y>  <bx1> <by1> <bx2> <by2>
 OBJECT red_block  <cx> <cy>  <bx1> <by1> <bx2> <by2>
 OBJECT blue_cup   <cx> <cy>  <bx1> <by1> <bx2> <by2>
-FRAME 1 33.333
+FRAME 1
 ...
 ```
 
