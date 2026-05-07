@@ -12,15 +12,7 @@ This repository implements the methodology described in the paper "Keyframe Extr
 - [Repository Structure](#repository-structure)
 - [Dependencies](#dependencies)
 - [Configuration](#configuration)
-- [Pipeline Walkthrough](#pipeline-walkthrough)
-  - [Step 1 — Object Discovery (`track_objects.py`)](#step-1--object-discovery-track_objectspy)
-  - [Step 2 — Hand and Object Tracking (`track_combined.py`)](#step-2--hand-and-object-tracking-track_combinedpy)
-  - [Step 3 — Cost Function Evaluation (`cost_function.py`)](#step-3--cost-function-evaluation-cost_functionpy)
-  - [Step 4 — Interaction Probability and Keyframe Selection (`interaction_prob.py`)](#step-4--interaction-probability-and-keyframe-selection-interaction_probpy)
-  - [Step 5 — Keyframe Extraction (`keyframes.py`)](#step-5--keyframe-extraction-keyframespy)
 - [Data Formats](#data-formats)
-- [Module Reference](#module-reference)
-- [Mathematical Background](#mathematical-background)
 - [Results and Output Files](#results-and-output-files)
 
 ---
