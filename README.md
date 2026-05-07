@@ -2,7 +2,7 @@
 
 A model-based keyframe extraction pipeline for robotic task learning from human video demonstrations. Given an RGB video of a human manipulation task, this codebase identifies the most informative frames — those corresponding to meaningful hand-object interactions — and delivers them to a Vision-Language Model (VLM) for task plan generation.
 
-This repository implements the methodology described in the paper "Keyframe Extraction from Human Demonstrations via Hand-Object Interaction Cost Function for VLM-Based Task Learning"*
+This repository implements the methodology described in the paper "Learning Long-Horizon Robotic Manipulation from Human Videos via Interaction-Aware Keyframe Selection and Vision-Language Planning"
 
 ---
 
@@ -19,8 +19,6 @@ This repository implements the methodology described in the paper "Keyframe Extr
 
 ## Overview
 
-Standard approaches to learning manipulation tasks from video either send the entire video to a VLM (which quickly saturates the context window) or sample frames at a fixed frequency (which may miss critical interaction moments). This project implements an **adaptive keyframe sampling** strategy grounded in a physics-inspired, multi-term cost function that measures the quality of hand-object interaction at every frame.
-
 The pipeline proceeds as follows:
 
 1. A VLM identifies all objects in the first frame of the video.
@@ -30,26 +28,31 @@ The pipeline proceeds as follows:
 5. The frames corresponding to local probability maxima are extracted as keyframes, each annotated with the dominant interacting object.
 6. The keyframes are fed sequentially to a VLM for task understanding and PDDL plan generation.
 
-The result is a significant **frame reduction** (typically >90% of frames are discarded) while retaining the semantically critical moments of the demonstration.
-
-## Repository Structure
+## Repo Structure
 
 ```
-.
-├── track_objects.py         
-├── track_combined.py        
-├── utils.py                 
-├── cost_function.py          
-├── interaction_prob.py      
-├── keyframes.py              
-├── keyframes/               
-│   ├── keyframes.py
-│   ├── cost_function.py
-│   ├── interaction_probability.py
-│   └── keyframes/ 
-│       ├── kf_001_frame0042_cup.jpg
-│       └── ...
-└── VLM_keyframe_cost_function_PREPRINT.pdf   # Reference paper
+.           
+├── src/
+|   ├── bridge
+|       ├── pddl2rapid.py
+|       └── pose_config.yaml
+|   ├── keyframes
+|       ├── cost_function.py
+|       ├── keyframes.py
+|       └── interaction_prob.py
+|   ├── tracking
+|       ├── track_combined.pyù
+|       ├── track_hands.py
+|       └── track_objects.py
+|   └── utils
+|       └── utils.py
+├── pddl/
+|   ├── bowl/
+|   ├── insertion/
+|   ├── sorting/
+|   ├── stacking/
+|   └── tool/
+└── 
 ```
 
 ---
