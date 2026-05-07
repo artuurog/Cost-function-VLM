@@ -190,20 +190,14 @@ def _encode_frame_base64(frame: np.ndarray) -> str:
 def list_objects_vlm(
     frame:   np.ndarray,
     api_key: str,
-    model:   str = "gpt-4o",
+    model:   str,
 ) -> list[str]:
     """
-    Send the first video frame to a Vision-Language Model and retrieve
-    a list of object labels present on the table.
-
-    The VLM acts as an open-vocabulary object namer so that the labels
-    it returns can be fed directly to GroundingDINO for localization.
-
     Parameters
     ----------
     frame   : BGR first frame of the video
-    api_key : OpenAI API key  (use "API_KEY" as placeholder)
-    model   : OpenAI model name (default: "gpt-4o")
+    api_key : API key  (use "API_KEY" as placeholder)
+    model   : model name ("Molmo2")
 
     Returns
     -------
@@ -255,10 +249,6 @@ def detect_objects_dino(
 ) -> dict[str, tuple]:
     """
     Run GroundingDINO on a single frame given a list of text labels.
-
-    Uses the HuggingFace Transformers interface
-    (AutoModelForZeroShotObjectDetection).  The model weights are downloaded
-    automatically on first call and cached locally.
 
     Parameters
     ----------
@@ -364,9 +354,6 @@ def _make_bbox_mask(frame: np.ndarray, bbox_xyxy: tuple) -> np.ndarray:
     """
     Generate a binary segmentation mask for an object given its bounding box.
 
-    Tries GrabCut for a tight foreground mask.  Falls back to a rectangular
-    mask if the region is too small or GrabCut fails.
-
     Parameters
     ----------
     frame     : BGR frame
@@ -416,23 +403,12 @@ def _make_bbox_mask(frame: np.ndarray, bbox_xyxy: tuple) -> np.ndarray:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Multi-object tracker  (OpenCV CSRT + periodic GroundingDINO re-detection)
+# Multi-object tracker
 # ─────────────────────────────────────────────────────────────────────────────
 
 class MultiObjectTracker:
     """
     Tracks multiple labeled objects across video frames.
-
-    Strategy
-    --------
-    - Each object gets its own OpenCV CSRT tracker, initialized from the
-      bounding boxes returned by GroundingDINO on the first frame.
-    - Every `redetect_every` frames, GroundingDINO is re-run to correct
-      drift accumulation.  Trackers are re-initialized for objects that are
-      successfully re-detected.
-    - A GrabCut segmentation mask is produced for each bounding box so that
-      downstream cost terms (enclosure, coverage) can be computed.
-
     Parameters
     ----------
     frame          : BGR first frame of the video
@@ -626,7 +602,7 @@ def compute_relative_distance(
     obj_traj:  list,   # list[np.ndarray | None]
 ) -> list:
     """
-    Compute the hand-object distance d_i(t) for every frame (Eq. 1 of the paper).
+    Compute the hand-object distance d_i(t) for every frame
 
         d_i(t) = || p_h(t) - p_oi(t) ||
 
@@ -692,7 +668,7 @@ def save_results_txt(
     """
     Write all per-frame tracking results to a formatted plain-text file.
 
-    File format (human-readable)
+    File format
     ----------------------------
     Header block with video metadata.
 

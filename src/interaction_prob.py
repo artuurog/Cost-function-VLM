@@ -3,12 +3,11 @@ interaction_probability.py
 
 Input
 -----
-  Cost results .txt file produced by cost_function.py.
+  Cost results .txt file
 
 Output
 ------
-  interaction_probability.txt — P_i(t) time-history for every object
-                                 + keyframe table at the end of the file.
+  interaction_probability.txt 
 """
 
 from __future__ import annotations
