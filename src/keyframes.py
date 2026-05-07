@@ -19,8 +19,7 @@ import numpy as np
 # ─────────────────────────────────────────────────────────────────────────────
 
 VIDEO_PATH = (
-    "C:/Users/user/Desktop/PoliMi/DOTTORATO/"
-    "hand object interaction/video/my_demos/red_block1.mp4"
+    ""
 )
 
 # Path to the interaction_probability.txt file
