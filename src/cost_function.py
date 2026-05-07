@@ -12,12 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-# from scipy.signal import savgol_filter
-# from scipy.signal import find_peaks
 
-# ─────────────────────────────────────────────────────────────────────────────
-# User settings
-# ─────────────────────────────────────────────────────────────────────────────
 
 TRACKING_RESULTS_PATH = "results/tracking_results.txt"
 COST_OUTPUT_PATH      = "results/cost_function.txt"
@@ -48,7 +43,7 @@ class HandSnapshot:
         return self.keypoints[FINGERTIP_INDICES]
 
     def hand_spread(self) -> float:
-        """R(t): mean distance of each keypoint from the wrist (Eq. 6)."""
+        """R(t): mean distance of each keypoint from the wrist."""
         dists = np.linalg.norm(self.keypoints[1:] - self.wrist, axis=1)
         return float(np.mean(dists))
 
@@ -80,7 +75,6 @@ def parse_tracking_file(path: str) -> Tuple[List[FrameRecord], float]:
       - list of FrameRecord (one per frame)
       - video FPS (parsed from header comment, default 30.0)
 
-    The expected file format is documented in the module docstring.
     """
     records: List[FrameRecord] = []
     fps = 30.0
