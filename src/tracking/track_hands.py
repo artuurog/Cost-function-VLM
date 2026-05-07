@@ -1,6 +1,5 @@
 """
 Video Hand-Object Interaction Tracker
-======================================
 """
 
 import argparse
@@ -83,7 +82,7 @@ class FrameResult:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Tracker principale
+# Tracker
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VideoHOITracker:
@@ -100,9 +99,9 @@ class VideoHOITracker:
     ):
         """
         Args:
-            mp_max_num_hands:              Numero massimo di mani da rilevare
-            mp_min_detection_confidence:   Soglia confidenza rilevamento MediaPipe
-            mp_min_tracking_confidence:    Soglia confidenza tracking MediaPipe
+            mp_max_num_hands
+            mp_min_detection_confidence
+            mp_min_tracking_confidence
         """
         # MediaPipe Hands
         self.mp_hands = MP_HANDS.Hands(
@@ -115,12 +114,7 @@ class VideoHOITracker:
         
 
     def _detect_hands(self, frame_rgb: np.ndarray, frame_w: int, frame_h: int) -> list[HandData]:
-        """
-        Rileva le mani nel frame RGB con MediaPipe.
 
-        Returns:
-            Lista di HandData, una per ogni mano rilevata
-        """
         results = self.mp_hands.process(frame_rgb)
         hands = []
 
@@ -133,16 +127,16 @@ class VideoHOITracker:
         ):
             handedness = handedness_info.classification[0].label  # "Left" / "Right"
 
-            # Estrai i 21 keypoints in coordinate pixel
+            # extract 21 keypoints in pixel values
             keypoints = np.array(
                 [[lm.x * frame_w, lm.y * frame_h] for lm in lm_list.landmark],
                 dtype=np.float32
             )  # shape: (21, 2)
 
-            # Calcola bounding box dalla nuvola di keypoints
+            # compute bbox of points
             x_coords = keypoints[:, 0]
             y_coords = keypoints[:, 1]
-            pad = 15  # pixel di padding
+            pad = 15  # pixel  padding
             x1 = max(0, int(np.min(x_coords)) - pad)
             y1 = max(0, int(np.min(y_coords)) - pad)
             x2 = min(frame_w, int(np.max(x_coords)) + pad)
@@ -164,20 +158,15 @@ class VideoHOITracker:
         skip_frames: int = 0,
     ) -> list[FrameResult]:
         """
-        Processa un video MP4 frame per frame.
-
         Args:
-            input_path:  Percorso al video di input (.mp4)
-            output_path: Percorso al video di output annotato (None = non salvare)
-            display:     Mostra il video a schermo durante l'elaborazione
-            skip_frames: Salta N frame tra un'analisi e l'altra (0 = analizza tutti)
-
-        Returns:
-            Lista di FrameResult, uno per ogni frame analizzato
+            input_path
+            output_path
+            display
+            skip_frames
         """
         cap = cv2.VideoCapture(input_path)
         if not cap.isOpened():
-            raise FileNotFoundError(f"Impossibile aprire il video: {input_path}")
+            raise FileNotFoundError(f"Cannot open video: {input_path}")
 
         frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -185,10 +174,10 @@ class VideoHOITracker:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         print(f"[INFO] Video: {input_path}")
-        print(f"[INFO] Risoluzione: {frame_w}x{frame_h} @ {fps:.1f} fps")
-        print(f"[INFO] Frame totali: {total_frames}")
+        print(f"[INFO] Resolution: {frame_w}x{frame_h} @ {fps:.1f} fps")
+        print(f"[INFO] Frames: {total_frames}")
 
-        # Writer per il video di output
+        # Writer for output video
         writer = None
         if output_path:
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -204,7 +193,6 @@ class VideoHOITracker:
                 if not ret:
                     break
 
-                # Salta frame se richiesto
                 if skip_frames > 0 and frame_idx % (skip_frames + 1) != 0:
                     frame_idx += 1
                     continue
@@ -212,10 +200,8 @@ class VideoHOITracker:
                 timestamp_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
                 frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
-                # ── 1. Rilevamento mani ───────────────────────────────────────
                 hands = self._detect_hands(frame_rgb, frame_w, frame_h)
 
-                # ── 3. Salva risultati ────────────────────────────────────────
                 frame_result = FrameResult(
                     frame_idx=frame_idx,
                     timestamp_ms=timestamp_ms,
@@ -223,14 +209,12 @@ class VideoHOITracker:
                     )
                 all_results.append(frame_result)
 
-                # ── 4. Annotazione visiva ─────────────────────────────────────
                 annotated = self._draw_annotations(frame_bgr.copy(), frame_result)
 
-                # ── 5. Stampa info a console ──────────────────────────────────
                 if frame_idx % 30 == 0:
                     print(
                         f"[Frame {frame_idx:5d}/{total_frames}] "
-                        f"Mani: {len(hands)}"
+                        f"Hands: {len(hands)}"
                     )
 
                 if writer:
@@ -239,7 +223,7 @@ class VideoHOITracker:
                 if display:
                     cv2.imshow("HOI Tracker", annotated)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
-                        print("[INFO] Interruzione da utente (tasto Q)")
+                        print("[INFO] User interrupt")
                         break
 
                 frame_idx += 1
@@ -252,7 +236,7 @@ class VideoHOITracker:
                 cv2.destroyAllWindows()
             self.mp_hands.close()
 
-        print(f"[INFO] Elaborazione completata. Frame analizzati: {len(all_results)}")
+        print(f"[INFO] Done analyzing. analyzed frames: {len(all_results)}")
         return all_results
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -260,33 +244,25 @@ class VideoHOITracker:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _draw_annotations(self, frame: np.ndarray, result: FrameResult) -> np.ndarray:
-        """Disegna mani, oggetti e distanze sul frame."""
 
-        # Converti in RGB per MediaPipe drawing, poi torna BGR
-        # frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
-
-        # ── Mani ─────────────────────────────────────────────────────────────
         for hand in result.hands:
             self._draw_hand(frame, hand)
 
-        # ── HUD info ──────────────────────────────────────────────────────────
         cv2.putText(frame,
-                    f"Mani: {len(result.hands)} ",
+                    f"Hands: {len(result.hands)} ",
                     (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         return frame
 
     def _draw_hand(self, frame: np.ndarray, hand: HandData) -> None:
-        """Disegna i 21 keypoints e il bounding box della mano."""
+        """draw 21 keypoints and hand bbox."""
         h, w = frame.shape[:2]
         color_map = {
-            "Right": (0, 255, 127),   # verde acqua
-            "Left":  (255, 165, 0),   # arancione
+            "Right": (0, 255, 127),   
+            "Left":  (255, 165, 0),
         }
         color = color_map.get(hand.handedness, (200, 200, 200))
 
-        # Connessioni MediaPipe (skeleton della mano)
         connections = MP_HANDS.HAND_CONNECTIONS
         for conn in connections:
             pt1 = hand.keypoints[conn[0]].astype(int)
@@ -298,7 +274,7 @@ class VideoHOITracker:
             x, y = int(kp[0]), int(kp[1])
             r = 5 if idx in FINGERTIP_INDICES else 3
             cv2.circle(frame, (x, y), r, color, -1)
-            cv2.circle(frame, (x, y), r, (255, 255, 255), 1)  # bordo bianco
+            cv2.circle(frame, (x, y), r, (255, 255, 255), 1) 
 
         # Bounding box
         x1, y1, x2, y2 = hand.bbox
@@ -306,23 +282,18 @@ class VideoHOITracker:
         cv2.putText(frame, hand.handedness, (x1, y1 - 6),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
-        # Centroide
+        # Centroid
         c = hand.centroid.astype(int)
         cv2.drawMarker(frame, tuple(c), color,
                        cv2.MARKER_CROSS, 12, 2, cv2.LINE_AA)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Funzioni di utilità post-processing
+# post-processing helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
 def compute_hand_velocity(results: list[FrameResult], fps: float) -> list[np.ndarray]:
     """
-    Calcola v_h(t): velocità della mano in pixel/secondo.
-    Sezione III.A dell'articolo.
-
-    Returns:
-        Lista di array (N_mani, 2) con velocità per ogni frame.
-        Il primo frame ha velocità zero.
+    compute hand velocity
     """
     velocities = [np.zeros((len(results[0].hands), 2), dtype=np.float32)]
     for t in range(1, len(results)):
@@ -340,32 +311,32 @@ def compute_hand_velocity(results: list[FrameResult], fps: float) -> list[np.nda
 
 
 def print_frame_summary(result: FrameResult) -> None:
-    """Stampa un riepilogo testuale del frame."""
+    """textual recap of the frame."""
     print(f"\n── Frame {result.frame_idx} (t={result.timestamp_ms:.0f} ms) ──")
 
     if result.hands:
         for i, hand in enumerate(result.hands):
-            print(f"  Mano [{i}] {hand.handedness}:")
-            print(f"    Centroide:    ({hand.centroid[0]:.1f}, {hand.centroid[1]:.1f})")
-            print(f"    Polso (kp0):  ({hand.wrist[0]:.1f}, {hand.wrist[1]:.1f})")
+            print(f"  Hand [{i}] {hand.handedness}:")
+            print(f"    Centroid:    ({hand.centroid[0]:.1f}, {hand.centroid[1]:.1f})")
+            print(f"    Wrist (kp0):  ({hand.wrist[0]:.1f}, {hand.wrist[1]:.1f})")
             print(f"    Spread R(t):  {hand.hand_spread():.2f} px")
             print(f"    Bbox:         {hand.bbox}")
     else:
-        print("  Nessuna mano rilevata.")
+        print("  No hand detected.")
 
     if result.objects:
         for obj in result.objects:
-            print(f"  Oggetto [{obj.track_id}] '{obj.label}' "
+            print(f"  Object [{obj.track_id}] '{obj.label}' "
                   f"conf={obj.confidence:.2f} "
-                  f"centro=({obj.centroid[0]:.1f}, {obj.centroid[1]:.1f})")
+                  f"center=({obj.centroid[0]:.1f}, {obj.centroid[1]:.1f})")
     else:
-        print("  Nessun oggetto rilevato.")
+        print("  No object detected.")
 
     dists = result.hand_object_distances()
     if dists:
-        print("  Distanze mano-oggetto [pixel]:")
+        print("  Hand-object distance [pixel]:")
         for (h_idx, t_id), d in dists.items():
-            print(f"    Mano[{h_idx}] ↔ Obj[{t_id}]: {d:.1f} px")
+            print(f"    Hand[{h_idx}] ↔ Obj[{t_id}]: {d:.1f} px")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -379,48 +350,36 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--input", "-i", required=True,
-        help="Percorso al video di input (.mp4)"
+        help="input video path(.mp4)"
     )
     parser.add_argument(
         "--output", "-o", default=None,
-        help="Percorso al video di output annotato (opzionale)"
+        help="outout annotated video path (optional)"
     )
     parser.add_argument(
         "--no-display", action="store_true",
-        help="Non mostrare il video durante l'elaborazione"
+        help="Do not show video during video processing"
     )
     parser.add_argument(
         "--skip", type=int, default=0,
-        help="Salta N frame tra un'analisi e l'altra (default: 0)"
+        help="Skip N frames"
     )
     parser.add_argument(
         "--max-hands", type=int, default=1,
-        help="Numero massimo di mani da rilevare (default: 2)"
+        help="Max number of hands to detect (default: 2)"
     )
     parser.add_argument(
         "--mp-detect-conf", type=float, default=0.5,
-        help="Soglia confidenza rilevamento MediaPipe (default: 0.5)"
+        help="Confidence threshold MediaPipe localizer (default: 0.5)"
     )
     parser.add_argument(
         "--mp-track-conf", type=float, default=0.5,
-        help="Soglia confidenza tracking MediaPipe (default: 0.5)"
+        help="Confidence threshold tracking MediaPipe (default: 0.5)"
     )
-    # parser.add_argument(
-    #     "--yolo-model", default="yolov8n.pt",
-    #     help="Modello YOLO da usare (default: yolov8n.pt)"
-    # )
-    # parser.add_argument(
-    #     "--yolo-conf", type=float, default=0.4,
-    #     help="Soglia confidenza YOLO (default: 0.4)"
-    # )
-    # parser.add_argument(
-    #     "--yolo-classes", nargs="+", type=int, default=None,
-    #     help="ID classi COCO da rilevare (default: tutte). "
-    #          "Es: --yolo-classes 39 41 67 (bottiglia, tazza, telefono)"
-    # )
+
     parser.add_argument(
         "--verbose", action="store_true",
-        help="Stampa dettagli per ogni frame"
+        help="Print frame details"
     )
     return parser.parse_args()
 
@@ -431,7 +390,7 @@ if __name__ == "__main__":
     
     # Validazione input
     if not Path(args.input).exists():
-        print(f"[ERROR] File non trovato: {args.input}")
+        print(f"[ERROR] File not found: {args.input}")
         sys.exit(1)
     
     tracker = VideoHOITracker(
@@ -459,6 +418,6 @@ if __name__ == "__main__":
     
     if len(results) > 1:
         hand_vel = compute_hand_velocity(results, fps)
-        print(f"\n[INFO] Velocità mano calcolata per {len(hand_vel)} frame.")
+        print(f"\n[INFO] Velocity not computed for {len(hand_vel)} frame.")
     
-    print("\n[DONE] Elaborazione terminata.")
+    print("\n[DONE] finished.")

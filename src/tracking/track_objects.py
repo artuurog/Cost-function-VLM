@@ -1,5 +1,5 @@
 """
-
+track objects in the video
 """
 
 import base64
@@ -17,8 +17,8 @@ from PIL import Image
 # USER SETTINGS  — edit these before running
 # ---------------------------------------------------------------------------
 
-VIDEO_PATH = "C:/Users/user/Desktop/PoliMi/DOTTORATO/hand object interaction/video/my_demos/red_block1.mp4"
-HF_TOKEN   = "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"
+VIDEO_PATH = ""
+HF_TOKEN   = ""
 
 PROMPT = (
     "You are an expert object localizer. Point to all the objects on the black table. "
@@ -44,11 +44,6 @@ def extract_first_frame(video_path: str):
     """
     Open the video file and read the very first frame.
 
-    Returns
-    -------
-    frame  : numpy array (H, W, 3) in BGR colour order
-    fps    : frames per second of the video
-    total  : total number of frames
     """
     cap = cv2.VideoCapture(video_path)
 
@@ -110,7 +105,7 @@ def encode_frame_as_base64(frame) -> str:
 
 def call_vlm(frame, prompt: str, hf_token: str) -> str:
     """
-    Send the image + prompt to Molmo-2-8B via the HuggingFace router.  
+    Send the image + prompt to VLM via the HuggingFace router.  
     """
 
     # --- Build the client -------------------------------------------------
@@ -149,8 +144,7 @@ def call_vlm(frame, prompt: str, hf_token: str) -> str:
     print("  Calling VLM...")
 
     completion = client.chat.completions.create(
-        # model="allenai/Molmo2-8B",
-        model="Qwen/Qwen3-VL-8B-Instruct",
+        model="allenai/Molmo2-8B",
         messages=messages,
         max_tokens=300,
         temperature=0,
@@ -165,10 +159,6 @@ def get_obj_coordinates(response: str) -> tuple[list[tuple[int, int]], list[str]
     coordinates = []
  
     # Each line looks like:   <name>: (<u>, <v>)
-    # The pattern captures:
-    #   group 1 — the object name  (anything before the colon)
-    #   group 2 — u coordinate     (integer inside the parentheses)
-    #   group 3 — v coordinate     (integer inside the parentheses)
     pattern = re.compile(r"^(.+?):\s*\((\d+),\s*(\d+)\)", re.MULTILINE)
  
     for match in pattern.finditer(response):
@@ -237,12 +227,6 @@ if __name__ == "__main__":
 
     frame, fps, total_frames = extract_first_frame(VIDEO_PATH)
 
-    # Save the frame as a JPEG in the same folder as the video
-    # stem       = Path(VIDEO_PATH).stem
-    # output_dir = Path(VIDEO_PATH).parent
-    # frame_path = str(output_dir / f"{stem}_first_frame.jpg")
-
-    # save_frame(frame, frame_path)
     show_frame(frame)
 
     print("\n  Frame visualized.\n")
