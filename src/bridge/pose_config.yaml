@@ -1,0 +1,51 @@
+# ============================================================
+# Pose Configuration File
+# Maps symbolic PDDL location names and orientation descriptors
+# to metric robot poses in the base frame.
+#
+# position: [x, y, z]  in millimetres
+# quaternion: [qw, qx, qy, qz]  (ABB convention: w first)
+# speed_data: RAPID speed identifier for motions TO this location
+# zone_data:  RAPID zone identifier (path blending radius)
+# motion_type: "MoveJ" | "MoveL"  (overrides per-location if set)
+# ============================================================
+
+locations:
+  home_loc:
+    position: [400.0, 0.0, 600.0]
+    quaternion: [1.0, 0.0, 0.0, 0.0]
+    speed_data: v200
+    zone_data: z10
+    motion_type: MoveJ
+
+  tool_rack_loc:
+    position: [550.0, 200.0, 300.0]
+    quaternion: [0.707, 0.0, 0.707, 0.0]
+    speed_data: v100
+    zone_data: z5
+    motion_type: MoveJ
+
+  above_target_loc:
+    position: [600.0, -150.0, 250.0]
+    quaternion: [0.707, 0.0, 0.707, 0.0]
+    speed_data: v100
+    zone_data: z5
+    motion_type: MoveJ
+
+  target_loc:
+    position: [600.0, -150.0, 120.0]
+    quaternion: [0.707, 0.0, 0.707, 0.0]
+    speed_data: v50
+    zone_data: fine
+    motion_type: MoveL
+
+# ============================================================
+# Orientation overrides applied during orient_* actions.
+# These patch the quaternion of the CURRENT robot pose in place.
+# ============================================================
+orientations:
+  vertical_orient:
+    quaternion: [0.707, 0.707, 0.0, 0.0]
+
+  hammer_strike_orient:
+    quaternion: [0.5, 0.5, 0.5, 0.5]
