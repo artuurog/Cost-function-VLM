@@ -9,7 +9,6 @@ This repository implements the methodology described in the paper "Keyframe Extr
 ## Table of Contents
 
 - [Overview](#overview)
-- [System Architecture](#system-architecture)
 - [Repository Structure](#repository-structure)
 - [Dependencies](#dependencies)
 - [Configuration](#configuration)
@@ -40,35 +39,6 @@ The pipeline proceeds as follows:
 6. The keyframes are fed sequentially to a VLM for task understanding and PDDL plan generation.
 
 The result is a significant **frame reduction** (typically >90% of frames are discarded) while retaining the semantically critical moments of the demonstration.
-
----
-
-## System Architecture
-
-```
-Human video
-    │
-    ▼
-┌────────────────────────────────────────────────────────────────┐
-│                     Keyframe Extraction                        │
-│                                                                │
-│  track_objects.py ──► track_combined.py ──► cost_function.py  │
-│  (object labels)      (tracking results)    (J_i(t) per obj)  │
-│                                                                │
-│                   interaction_prob.py ──► keyframes.py         │
-│                   (P_i(t), local maxima)   (JPEG / video out)  │
-└────────────────────────────────────────────────────────────────┘
-    │
-    ▼
-Keyframes + dominant object labels
-    │
-    ▼
-VLM  ──►  PDDL domain / problem / action sequence  ──►  Robot code
-```
-
-Each stage writes its output to the `results/` directory in a structured, human-readable `.txt` format, so any stage can be re-run independently.
-
----
 
 ## Repository Structure
 
