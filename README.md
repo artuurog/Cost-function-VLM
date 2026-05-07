@@ -46,7 +46,7 @@ The pipeline proceeds as follows:
 |       ├── keyframes.py
 |       └── interaction_prob.py
 |   ├── tracking
-|       ├── track_combined.pyù
+|       ├── track_combined.py
 |       ├── track_hands.py
 |       └── track_objects.py
 |   └── utils
