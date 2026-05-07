@@ -45,7 +45,7 @@ The pipeline proceeds as follows:
 |       ├── track_hands.py
 |       └── track_objects.py
 |   └── utils
-|       └── utils.yaml
+|       └── utils.py
 ├── pddl/
 |   ├── bowl/
 |   ├── insertion/
