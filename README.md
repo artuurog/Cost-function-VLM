@@ -1,4 +1,4 @@
-# VLM Keyframe Extraction via Hand-Object Interaction Cost Function
+# Learning Long-Horizon Robotic Manipulation from Human Videos via Interaction-Aware Keyframe Selection and Vision-Language Planning
 
 A model-based keyframe extraction pipeline for robotic task learning from human video demonstrations. Given an RGB video of a human manipulation task, this codebase identifies the most informative frames — those corresponding to meaningful hand-object interactions — and delivers them to a Vision-Language Model (VLM) for task plan generation.
 
