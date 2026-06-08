@@ -932,7 +932,6 @@ def compute_all_costs(
 if __name__ == "__main__":
     costs, num_hands = compute_all_costs(TRACKING_RESULTS_PATH, COST_OUTPUT_PATH)
 
-    # ── Quick summary ─────────────────────────────────────────────────────────
     print("\n[Summary]  Mean cost values across all frames:")
 
     if num_hands == 1:
