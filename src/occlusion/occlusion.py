@@ -1,11 +1,14 @@
 import numpy as np
 import cv2
+import os
 
 
 # Path to the input RGB image
-IMAGE_PATH = "C:/Users/user/Desktop/VLM keyframe/immagini VLM keyframe/annotated_hands/sorting_demo (1).png"
+IMAGE_PATH = ""
 
-OCCLUSION_PERCENTAGE = 0.15
+SAVE_PATH = ""
+
+OCCLUSION_PERCENTAGE = 0.35
 
 NUM_PATCHES = 3
 
@@ -40,29 +43,17 @@ def apply_patches(image: np.ndarray, positions: list[tuple[int, int]],
 
 
 def main() -> None:
-    # ------------------------------------------------------------------
-    # 1. Load image
-    # ------------------------------------------------------------------
     image = cv2.imread(IMAGE_PATH)
     if image is None:
         raise FileNotFoundError(f"Could not load image at: {IMAGE_PATH}")
 
-    # ------------------------------------------------------------------
-    # 2. Image dimensions
-    # ------------------------------------------------------------------
     H, W = image.shape[:2]
     print(f"Image size: H={H}, W={W}")
 
-    # ------------------------------------------------------------------
-    # 3. Read occlusion percentage from user parameter (already a float)
-    # ------------------------------------------------------------------
     occlusion_pct = float(OCCLUSION_PERCENTAGE)
     assert 0.0 < occlusion_pct < 1.0, \
         "OCCLUSION_PERCENTAGE must be strictly between 0 and 1."
-
-    # ------------------------------------------------------------------
-    # 4. Compute patch side length L
-    # ------------------------------------------------------------------
+        
     L = compute_patch_side(H, W, occlusion_pct, NUM_PATCHES)
     print(f"Occlusion percentage : {occlusion_pct * 100:.1f} %")
     print(f"Patch side length    : L = {L} px  ({L}×{L} pixels per patch)")
@@ -70,28 +61,31 @@ def main() -> None:
           f"{NUM_PATCHES * L * L / (H * W) * 100:.2f} % "
           f"(target: {occlusion_pct * 100:.1f} %)")
 
-    # ------------------------------------------------------------------
-    # 5. Sample 3 random patch positions
-    # ------------------------------------------------------------------
+  
     np.random.seed(None)   # remove or set a fixed seed for reproducibility
     positions = sample_patch_positions(H, W, L, NUM_PATCHES)
     for idx, (r, c) in enumerate(positions):
         print(f"  Patch {idx + 1}: top-left=({r}, {c}), "
               f"bottom-right=({r + L}, {c + L})")
 
-    # ------------------------------------------------------------------
-    # 6. Apply patches to a copy of the image
-    # ------------------------------------------------------------------
     occluded = apply_patches(image, positions, L)
 
-    # ------------------------------------------------------------------
-    # 7. Display original and occluded images side by side
-    # ------------------------------------------------------------------
     cv2.imshow("Original image", image)
     cv2.imshow("Occluded image", occluded)
     print("\nPress any key in the image window to close.")
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    
+    if SAVE_PATH is not None:
+        os.makedirs(SAVE_PATH, exist_ok=True)
+        base_name = os.path.basename(IMAGE_PATH)
+        stem, ext = os.path.splitext(base_name)
+        out_filename = f"{stem}_occluded{ext}"
+        out_path = os.path.join(SAVE_PATH, out_filename)
+        success = cv2.imwrite(out_path, occluded)
+        if not success:
+            raise IOError(f"Failed to write occluded image to: {out_path}")
+        print(f"Occluded image saved : {out_path}")
 
 
 if __name__ == "__main__":
