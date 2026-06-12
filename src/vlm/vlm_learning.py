@@ -1,5 +1,5 @@
 """
-vlm_planner.py
+VLM for task learning
 ==============
 """
 
@@ -32,7 +32,7 @@ PROBABILITY_FILE: str = "results/interaction_probability.txt"  # optional fallba
 OUTPUT_DIR: str = "results/pddl"                  # where the 3 PDDL files are saved
 
 # Short identifier used to name the output files and the PDDL (domain problem).
-TASK_NAME: str = "manipulation_task"
+TASK_NAME: str = "sorting_task"
 
 TASK_HINT: str = ""
 
