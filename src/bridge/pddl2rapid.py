@@ -41,7 +41,6 @@ logger = logging.getLogger("pddl_rapid_bridge")
 
 @dataclass
 class Quaternion:
-    """ABB quaternion convention: w first, then x, y, z."""
     w: float
     x: float
     y: float
