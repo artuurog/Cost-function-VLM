@@ -11,61 +11,33 @@ from pathlib import Path
 from PIL import Image
 
 
-# ===========================================================================
-# USER SETTINGS  — edit these before running
-# ===========================================================================
-
-# --- Backend selection -----------------------------------------------------
-# True  -> run the VLM locally with transformers
-# False -> call the VLM through the HuggingFace Inference router (API)
 USE_LOCAL_INFERENCE = False
 
-# Name of the VLM to use (HuggingFace repository id).
-# Must be the same id whether running locally or via the API router.
-VLM_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"
+VLM_MODEL = "allenai/Molmo2-8B"
 
-# HuggingFace access token (required for the API backend; also used for gated
-# models when running locally). Leave as "" if not needed for a local model.
 HF_TOKEN = ""
 
 # --- Input / output paths --------------------------------------------------
 WORKSPACE_IMAGE = "workspace.jpg"   # current scene image
 DOMAIN_FILE     = "domain.pddl"     # offline task domain
 PROBLEM_FILE    = "problem.pddl"    # offline task problem
-OUTPUT_PLAN     = "plan.pddl"       # adapted grounded plan (output)
+OUTPUT_PLAN     = "plan.pddl"       
 
-# Object positions in PIXEL coordinates, as produced by the perception module
-# (see track_objects.py). Format: {label: (u, v)}.
-OBJECT_POSITIONS = {
-    # "red_block":   (320, 210),
-    # "blue_block":  (455, 198),
-    # "green_block": (390, 305),
-}
+
+OBJECT_POSITIONS = {}
 
 # --- Inference parameters --------------------------------------------------
 HF_ROUTER_BASE_URL = "https://router.huggingface.co/v1"
 MAX_NEW_TOKENS     = 512
-TEMPERATURE        = 0.0            # deterministic output for reproducibility
+TEMPERATURE        = 0.0
 
 
-# ===========================================================================
-# Grounded-action grammar
-# ---------------------------------------------------------------------------
-# This regex is intentionally identical to the one used by the downstream
-# bridge (pddl2rapid.py -> PDDLPlanParser._ACTION_RE). Validating the VLM
-# output against the very same pattern guarantees that every line we write is
-# parseable by the robot bridge.
-# ===========================================================================
 _ACTION_RE = re.compile(
     r"^\(\s*([a-zA-Z_][a-zA-Z0-9_\-]*)"        # action name
-    r"((?:\s+[a-zA-Z_][a-zA-Z0-9_\-]*)*)"      # zero or more identifier params
+    r"((?:\s+[a-zA-Z_][a-zA-Z0-9_\-]*)*)"      
     r"\s*\)$"
 )
 
-
-# ===========================================================================
-# Small helpers
-# ===========================================================================
 
 def read_text(path: str) -> str:
     """Read a UTF-8 text file (e.g. a PDDL file)."""
@@ -80,8 +52,6 @@ def load_pil_image(path: str) -> Image.Image:
 def encode_image_base64(path: str) -> str:
     """
     Load an image file and return it as a base64-encoded JPEG string.
-    Re-encoding through PIL also normalises PNG/other inputs to JPEG, matching
-    the data-URL format expected by the API backend (cf. track_objects.py).
     """
     image = load_pil_image(path)
     buffer = io.BytesIO()
@@ -102,8 +72,7 @@ def format_object_positions(object_positions: dict) -> str:
 # Prompt construction
 # ===========================================================================
 
-# Role / behaviour instructions for the VLM. Kept strict so that the raw
-# response is directly parseable into a grounded plan.
+# Role / behaviour instructions for the VLM
 SYSTEM_INSTRUCTION = (
     "You are a task-plan adaptation module for a robotic manipulator. "
     "You receive a PDDL domain, a PDDL problem, an image of the current "
@@ -189,11 +158,8 @@ def call_vlm_local(image_path: str, prompt: str, model: str) -> str:
     """
     Run the VLM locally with HuggingFace transformers.
 
-    Uses the generic image-text-to-text interface, which works for common
-    chat VLMs (Qwen-VL, LLaVA-NeXT, SmolVLM, ...). Some models may require a
-    specific model/processor class; adjust the imports below if needed.
     """
-    import torch  # imported lazily so API runs don't need torch installed
+    import torch
     from transformers import AutoProcessor, AutoModelForImageTextToText
 
     token = HF_TOKEN or None
@@ -218,7 +184,6 @@ def call_vlm_local(image_path: str, prompt: str, model: str) -> str:
         },
     ]
 
-    # Build the prompt string with the model's chat template, then attach the image.
     text = processor.apply_chat_template(messages, add_generation_prompt=True)
     inputs = processor(text=text, images=[image], return_tensors="pt").to(vlm.device)
 
@@ -227,10 +192,9 @@ def call_vlm_local(image_path: str, prompt: str, model: str) -> str:
         generated = vlm.generate(
             **inputs,
             max_new_tokens=MAX_NEW_TOKENS,
-            do_sample=False,            # deterministic, mirrors temperature=0
+            do_sample=False,
         )
 
-    # Keep only the newly generated tokens (strip the prompt portion).
     new_tokens = generated[:, inputs["input_ids"].shape[1]:]
     return processor.batch_decode(new_tokens, skip_special_tokens=True)[0]
 
@@ -249,10 +213,6 @@ def generate_plan_text(image_path: str, prompt: str) -> str:
 def parse_domain_action_arity(domain_text: str) -> dict:
     """
     Lightweight PDDL domain parser: return {action_name: parameter_count}.
-
-    For each (:action NAME ... :parameters ( ... )) block, the number of
-    parameters is the number of '?vars' in the parameters list. This is used
-    only to validate the VLM output, so a full PDDL parser is not required.
     """
     arity = {}
     pattern = re.compile(
@@ -348,11 +308,9 @@ def adapt_plan(image_path: str,
     domain_text  = read_text(domain_file)
     problem_text = read_text(problem_file)
 
-    # 1) Build the prompt and query the VLM.
     prompt   = build_adaptation_prompt(domain_text, problem_text, object_positions)
     raw_plan = generate_plan_text(image_path, prompt)
 
-    # 2) Extract grounded actions from the raw response.
     actions = extract_plan_actions(raw_plan)
     if not actions:
         print("  [WARNING] No grounded actions found in the VLM response.")
@@ -360,13 +318,11 @@ def adapt_plan(image_path: str,
         print(raw_plan)
         print("  ----------------------")
 
-    # 3) Validate the actions against the domain signatures.
     arity    = parse_domain_action_arity(domain_text)
     warnings = validate_plan(actions, arity)
     for w in warnings:
         print(f"  [WARNING] {w}")
 
-    # 4) Write the adapted plan.
     write_plan(actions, output_plan, VLM_MODEL)
     print("=== Done ===")
     return actions
