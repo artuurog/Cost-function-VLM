@@ -61,7 +61,7 @@ The pipeline proceeds as follows:
 ```
 ## Dataset
 
-The dataset containing the human video demonstrations used in this study are available [here](https://huggingface.co/datasets/artuurog/Cost-function-VLM-dataset)
+The dataset containing the human video demonstrations used in this study is available [here](https://huggingface.co/datasets/artuurog/Cost-function-VLM-dataset)
 
 ---
 
