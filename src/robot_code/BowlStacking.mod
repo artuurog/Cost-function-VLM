@@ -1,4 +1,4 @@
-MODULE BowlStackingModule
+MODULE BowlStacking
     !=====================================================================
     ! BOWL STACKING MODULE
     !

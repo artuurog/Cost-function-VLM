@@ -1,4 +1,4 @@
-MODULE PyramidStack
+MODULE BlockStacking
     !=====================================================================
     ! BLOCK STACKING TASK
     !

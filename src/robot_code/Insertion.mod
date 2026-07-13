@@ -1,4 +1,4 @@
-MODULE BeadInsertion
+MODULE Insertion
     !=======================================================================
     ! Bead-on-stick insertion task
     ! Picks NUM_BEADS beads from the table and inserts each onto its

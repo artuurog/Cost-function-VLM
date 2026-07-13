@@ -1,20 +1,7 @@
-MODULE SortingModule
+MODULE Sorting
     !======================================================================
     ! SortingModule
     !
-    ! Sorts a series of items from the table into containers, based on a
-    ! fixed item -> container assignment (mirrors the PDDL sorting-task
-    ! domain: grasp -> move -> release, with assigned-to as the sorting rule).
-    !
-    ! ASSUMPTIONS (adjust if these don't match your station):
-    !   - tGripper (tooldata) and wobjTable (wobjdata) are already defined
-    !     elsewhere in the program, as in the existing pick-and-place module.
-    !   - pHome is a calibrated jointtarget defined elsewhere; placeholder
-    !     value below must be replaced.
-    !   - GetObjectPosition(objNo) and GetContainerTarget(contNo) are
-    !     external functions (not implemented here) returning a robtarget
-    !     for the object's current pick position / the container's drop
-    !     position respectively.
     !======================================================================
 
     !----------------------------------------------------------------------
