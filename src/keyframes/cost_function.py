@@ -477,6 +477,11 @@ def hand_compactness_cost(
     """
     phi_comp(t) = 1 / (1 + w_d(t) * alpha(t))  (Eq. 8)
 
+    alpha(t) = max(0, 1 - R(t) / R_ref) is clamped to [0, 1], so hands more
+    extended than the reference scale give no compactness evidence.  With
+    w_d(t) in (0, 1] this bounds phi_comp(t) to [1/2, 1]; phi_comp(t) = 1
+    when R(t) >= R_ref (and on frames where the hand is not detected).
+
     Parameters
     ----------
     use_hand2 : select secondary hand keypoints when True
@@ -490,7 +495,7 @@ def hand_compactness_cost(
             continue
 
         R_t   = src.hand_spread()
-        alpha = 1.0 - R_t / (R_ref + 1e-9)
+        alpha = max(0.0, 1.0 - R_t / (R_ref + 1e-9))
 
         fingertips = src.fingertips
         obj_pos    = poi[t]
@@ -503,48 +508,97 @@ def hand_compactness_cost(
     return phi_comp
 
 
+def _clip_polygon_axis(
+    poly:    np.ndarray,
+    axis:    int,
+    bound:   float,
+    keep_ge: bool,
+) -> np.ndarray:
+    """
+    One Sutherland-Hodgman pass: clip a polygon (N, 2) against the half-plane
+    poly[:, axis] >= bound (keep_ge) or poly[:, axis] <= bound (not keep_ge).
+    """
+    out = []
+    for i in range(len(poly)):
+        cur, prev = poly[i], poly[i - 1]
+        cur_in  = cur[axis]  >= bound if keep_ge else cur[axis]  <= bound
+        prev_in = prev[axis] >= bound if keep_ge else prev[axis] <= bound
+        if cur_in != prev_in:
+            s = (bound - prev[axis]) / (cur[axis] - prev[axis])
+            out.append(prev + s * (cur - prev))
+        if cur_in:
+            out.append(cur)
+    return np.array(out, dtype=np.float64).reshape(-1, 2)
+
+
+def _polygon_area(poly: np.ndarray) -> float:
+    """Shoelace area of a polygon (N, 2); 0 for fewer than 3 vertices."""
+    if len(poly) < 3:
+        return 0.0
+    x, y = poly[:, 0], poly[:, 1]
+    return 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
+
+
+def coverage_ratio(
+    keypoints: np.ndarray,
+    bbox:      Tuple[int, int, int, int],
+) -> float:
+    """
+    rho_i(t) = |M_h(t) ∩ M_oi(t)| / |M_oi(t)|  (Eq. 9)
+
+    The hand mask M_h is the convex hull of the 21 landmarks and the object
+    mask M_oi is its bounding box (the tracking file stores no segmentation
+    masks).  Both are convex, so the intersection area is computed exactly by
+    clipping the hull polygon against the box rather than rasterising.
+    """
+    from scipy.spatial import ConvexHull, QhullError
+
+    x1, x2 = sorted((float(bbox[0]), float(bbox[2])))
+    y1, y2 = sorted((float(bbox[1]), float(bbox[3])))
+    A_obj  = (x2 - x1) * (y2 - y1)
+    if A_obj <= 0.0:
+        return 0.0
+
+    try:
+        hull = ConvexHull(keypoints)
+    except QhullError:      # degenerate hand (e.g. collinear landmarks)
+        return 0.0
+
+    poly = keypoints[hull.vertices].astype(np.float64)
+    for axis, bound, keep_ge in ((0, x1, True), (0, x2, False),
+                                 (1, y1, True), (1, y2, False)):
+        poly = _clip_polygon_axis(poly, axis, bound, keep_ge)
+    return float(np.clip(_polygon_area(poly) / A_obj, 0.0, 1.0))
+
+
 def enclosure_cost(
     records:   List[FrameRecord],
-    poi:       np.ndarray,
+    label:     str,
     use_hand2: bool = False,
 ) -> np.ndarray:
     """
     phi_enc_i(t) = exp(-(rho_i(t) - 1)) - 1  (Eq. 10)
 
+    rho_i(t) is the coverage ratio of object i by the hand (see
+    coverage_ratio), so phi_enc_i is 0 when the object is fully covered and
+    e - 1 when there is no overlap, when the hand is not detected, or when
+    object i is not detected in the frame.
+
     Parameters
     ----------
+    label     : label of object i
     use_hand2 : select secondary hand keypoints when True
     """
-    from scipy.spatial import ConvexHull, Delaunay
-
     T       = len(records)
     phi_enc = np.full(T, np.exp(1.0) - 1.0, dtype=np.float64)
 
     for t, rec in enumerate(records):
         src = rec.hand2 if use_hand2 else rec.hand
-        if src is None:
+        obj = rec.objects.get(label)
+        if src is None or obj is None:
             continue
 
-        kp = src.keypoints   # (21, 2)
-
-        obj_label = _find_object_label_for_frame(rec)
-        if obj_label is None:
-            continue
-        obj = rec.objects[obj_label]
-        bx1, by1, bx2, by2 = obj.bbox
-        test_pts = np.array([
-            [bx1, by1], [bx2, by1], [bx2, by2], [bx1, by2],
-            [(bx1 + bx2) / 2, (by1 + by2) / 2],
-        ], dtype=np.float64)
-
-        try:
-            hull   = ConvexHull(kp)
-            tri    = Delaunay(kp[hull.vertices])
-            inside = tri.find_simplex(test_pts) >= 0
-            rho    = float(np.mean(inside))
-        except Exception:
-            rho = 0.0
-
+        rho        = coverage_ratio(src.keypoints, obj.bbox)
         phi_enc[t] = np.exp(-(rho - 1.0)) - 1.0
 
     return phi_enc
@@ -558,15 +612,6 @@ def coupling_term(
     phi_couple_i(t) = max(0, exp(phi_d_i(t) * phi_v(t)) - 1)  (Eq. 11)
     """
     return np.maximum(0.0, np.exp(phi_d * phi_v) - 1.0)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Internal helper
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _find_object_label_for_frame(rec: FrameRecord) -> Optional[str]:
-    """Return the first object label present in a frame, or None."""
-    return next(iter(rec.objects), None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -698,7 +743,7 @@ def evaluate_costs_for_object(
     phi_dir    = hand_direction_cost(vh, ph, poi)
     phi_obj    = object_velocity_cost(ph, poi, records, fps, v_th)
     phi_comp   = hand_compactness_cost(records, poi, R_ref, sigma_d, use_hand2=use_hand2)
-    phi_enc    = enclosure_cost(records, poi, use_hand2=use_hand2)
+    phi_enc    = enclosure_cost(records, label, use_hand2=use_hand2)
     phi_couple = coupling_term(phi_d, phi_v)
 
     J = phi_d + phi_v + phi_dir + phi_obj + phi_comp + phi_enc + phi_couple
