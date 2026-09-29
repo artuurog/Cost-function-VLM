@@ -1,16 +1,5 @@
 """
 VLM-based PDDL validation and repair
-====================================
-
-Input : the three PDDL files of a task (domain, problem, plan).
-Output: the same three files, revised and corrected.
-
-A deterministic symbolic checker first parses the three files and gathers hard
-evidence about them (undeclared symbols, arity and type mismatches, unsatisfied
-preconditions, unreached goals). That evidence is handed to the VLM, which is
-the reasoning core: it decides *what is actually wrong* and rewrites the three
-components. The corrected files are re-checked, and the loop repeats until the
-plan is consistent and feasible or MAX_REPAIR_ROUNDS is exhausted.
 """
 
 from __future__ import annotations
