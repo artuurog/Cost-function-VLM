@@ -201,7 +201,7 @@ The `bowl` and `sorting` folders ship a domain and a problem only; their action 
 
 ## Dataset
 
-The dataset containing the human video demonstrations used in this study is available [here](https://huggingface.co/datasets/artuurog/Cost-function-VLM-dataset)
+The dataset containing the human video demonstrations used in this study is available [here]()
 
 ---
 
